@@ -21,10 +21,10 @@ class CNN(nn.Module):
     self.input_channels = input_channels
     
     # some things to play with
-    self.fc1_out_dim = 120
-    self.fc2_out_dim = 84
+    self.fc1_out_dim = 30
+    self.fc2_out_dim = 30
     self.conv1_output_channels = 3
-    self.conv2_output_channels = 10
+    self.conv2_output_channels = 5
     
     # NOTE: very confusing but basically this just makes sure that the output dimensions after convolutions
     # matches up with the linearities input dimensions applied after; this is needed for resizing the convolution
@@ -122,9 +122,6 @@ def train_net_via_ES(net, trainloader, variance, lr, pop_size, criterion, epochs
       current_loss = score_net_ES(net, inputs, labels, criterion)
       if i % 10 == (10 - 1):
         print("[Epoch {}, Iter {}] loss: {}".format(epoch + 1, i + 1, current_loss))
-        #print "Outputs from Most Recent Iteration: {}".format(outputs)
-        running_loss = 0.0
-
 
 ##### TESTING CODE #####
 def evaluate_net(net, testloader):
@@ -143,7 +140,7 @@ def evaluate_net(net, testloader):
 # load data and set some basic parameters
 train_batch = 4
 test_batch = 1
-epochs = 2
+epochs = 3
 es_lr = 0.1
 sgd_lr = 0.001
 es_var = 0.5 # TODO: not really sure how to set this
@@ -180,7 +177,7 @@ criterion = nn.CrossEntropyLoss()
 #optimizer = optim.Adam(net.parameters()) # TODO: somehow training the CNN didn't work when using this; need to figure out why
 optimizer = optim.SGD(net.parameters(), lr=sgd_lr, momentum=0.9)
 
-#train_net_via_backprop(net, trainloader, optimizer, criterion, epochs) # 04/20/2018: 9768 correct out of 10000 achieved using backprop without maxpooling
-train_net_via_ES(net, trainloader, es_var, es_lr, es_pop_size, criterion, epochs)
+train_net_via_backprop(net, trainloader, optimizer, criterion, epochs) # 04/20/2018: 9768 correct out of 10000 achieved using backprop without maxpooling
+#train_net_via_ES(net, trainloader, es_var, es_lr, es_pop_size, criterion, epochs)
 evaluate_net(net, testloader)
 
