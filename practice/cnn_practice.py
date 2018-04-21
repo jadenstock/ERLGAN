@@ -1,9 +1,15 @@
+# other utils
+import numpy as np
+import multiprocessing as mp
+
+# torch autograd, nn, etc.
 import torch
 from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
+# torch data
 import torchvision
 import torchvision.transforms as transforms
 
@@ -77,48 +83,74 @@ def train_net_via_backprop(net, trainloader, optimizer, criterion, epochs):
 
 ##### CODE FOR EVOLUTIONARY STRATEGIES #####
 
+def forward_score_child_mp_process(net, perturbation, inputs, labels, criterion, scores, index, std_dev):
+  new_net = CNN(net.input_height, net.input_width, net.input_channels, net.output_dim, net.conv_dim)
+  net_state_dict = net.state_dict()
+  new_net.load_state_dict(make_perturbed_net_state_dict(net_state_dict, perturbation, std_dev))
+  score = score_net_ES(new_net, inputs, labels, criterion)
+  scores[index] = score
+
 # always do N(0,1) independent entries
-def get_net_perturbations(net_state_dict):
+def get_net_perturbations(net_state_dict, seed): # may be useful to fix a seed to help debugging
+  generator = np.random.RandomState(seed)
   perturbations = {}
   for name, params in net_state_dict.items():
-    size = params.size()
-    perturbations[name] = torch.randn(size)
+    perturbations[name] = torch.from_numpy(generator.normal(loc=0.0, scale=1.0, size=params.size())).float()
   return perturbations
 
-def make_perturbed_net_state_dict(net_state_dict, perturbation, variance):
+def make_perturbed_net_state_dict(net_state_dict, perturbation, std_dev):
   new_net = {}
   for name, params in net_state_dict.items():
-    new_net[name] = params + variance * perturbation[name]
+    new_net[name] = params + std_dev * perturbation[name]
   return new_net
 
 # TODO: this can actually be used for backprop above
 def score_net_ES(net, inputs, labels, criterion):
   outputs = net.forward(inputs)
   loss = criterion(outputs, labels)
-  return loss.data[0] / inputs.size()[0] # inputs.size()[0] is the batch size
+  return -loss.data[0] #/ inputs.size()[0] # inputs.size()[0] is the batch size
 
-def average_nets_ES(net_state_dict, perturbations, scores, variance, lr):
+def average_nets_ES(net_state_dict, perturbations, scores, std_dev, lr):
   new_net = {}
   for name, params in net_state_dict.items():
-    new_net[name] = (lr / (len(perturbations) * variance)) * sum([scores[i] * perturbations[i][name] for i in range(len(perturbations))])
+    new_net[name] = (lr / (len(perturbations) * std_dev)) * sum([scores[i] * perturbations[i][name] for i in range(len(perturbations))])
     new_net[name].add_(params)
   return new_net
 
 # TODO: NEED TO PARALLELIZE OR THIS WILL TAKE FOREVER
-def train_net_via_ES(net, trainloader, variance, lr, pop_size, criterion, epochs):
+def train_net_via_ES(net, trainloader, std_dev, lr, pop_size, criterion, epochs, seed_generator_seed=42):
+  seed_generator = np.random.RandomState(seed_generator_seed)
+  max_seed = (2**31) - 1
   for epoch in range(epochs):
     for i, data_batch in enumerate(trainloader, 0):
       inputs, labels = data_batch
       inputs, labels = Variable(inputs), Variable(labels)
-      net_state_dict = net.state_dict()
-      perturbations = [get_net_perturbations(net_state_dict) for _ in range(pop_size)]
-      scores = []
+      net_state_dict = net.state_dict() 
+      seeds = seed_generator.randint(low=0, high=max_seed, size=pop_size)
+      perturbations = [get_net_perturbations(net_state_dict, seeds[j]) for j in range(pop_size)]
+      
+      manager = mp.Manager()
+#      scores = [1.0] * pop_size # for nonparallel version
+      scores = manager.list([1.0] * pop_size)
+      processes = []
       for j in range(pop_size):
         perturbation = perturbations[j]
-        new_net = CNN(net.input_height, net.input_width, net.input_channels, net.output_dim, net.conv_dim)
-        new_net.load_state_dict(make_perturbed_net_state_dict(net_state_dict, perturbation, variance))
-        scores.append(score_net_ES(new_net, inputs, labels, criterion))
-      net.load_state_dict(average_nets_ES(net_state_dict, perturbations, scores, variance, lr))
+#        forward_score_child_mp_process(net, perturbation, inputs, labels, criterion, scores, j, std_dev) # for nonparallel version
+        p = mp.Process(target=forward_score_child_mp_process, args=(net,
+                                                                    perturbation,
+                                                                    inputs,
+                                                                    labels,
+                                                                    criterion,
+                                                                    scores,
+                                                                    j,
+                                                                    std_dev))
+        p.start()
+        processes.append(p)
+      for p in processes:
+        p.join()
+      scores = np.array(scores)
+      scores = scores / sum(scores)
+      net.load_state_dict(average_nets_ES(net_state_dict, perturbations, scores, std_dev, lr))
       current_loss = score_net_ES(net, inputs, labels, criterion)
       if i % 10 == (10 - 1):
         print("[Epoch {}, Iter {}] loss: {}".format(epoch + 1, i + 1, current_loss))
@@ -137,47 +169,51 @@ def evaluate_net(net, testloader):
       correct += 1
   print("{} correct out of {}".format(correct, total))
 
-# load data and set some basic parameters
-train_batch = 4
-test_batch = 1
-epochs = 3
-es_lr = 0.1
-sgd_lr = 0.001
-es_var = 0.5 # TODO: not really sure how to set this
-es_pop_size = 10 # TODO: also not really sure how to set this
+if __name__ == "__main__":
+  # load data and set some basic parameters
+  train_batch = 4
+  test_batch = 1
+  epochs = 1
+  es_lr = 0.1
+  sgd_lr = 0.001
+  es_std_dev = 0.1 # TODO: not really sure how to set this
+  es_pop_size = 100 # TODO: also not really sure how to set this
 
-trainset = torchvision.datasets.MNIST(root="./mnist",
-            train=True,
-            download=True,
-            transform=transforms.ToTensor())
-trainloader = torch.utils.data.DataLoader(trainset,
-            batch_size=train_batch,
-            shuffle=True,
-            num_workers=2)
-testset = torchvision.datasets.MNIST(root="./mnist",
-           train=False,
-           download=True,
-           transform=transforms.ToTensor())
-testloader = torch.utils.data.DataLoader(testset,
-           batch_size=test_batch,
-           shuffle=False,
-           num_workers=2)
+  trainset = torchvision.datasets.MNIST(root="./mnist",
+              train=True,
+              download=True,
+              transform=transforms.ToTensor())
+  trainloader = torch.utils.data.DataLoader(trainset,
+              batch_size=train_batch,
+              shuffle=True,
+              num_workers=2)
+  testset = torchvision.datasets.MNIST(root="./mnist",
+             train=False,
+             download=True,
+             transform=transforms.ToTensor())
+  testloader = torch.utils.data.DataLoader(testset,
+             batch_size=test_batch,
+             shuffle=False,
+             num_workers=2)
 
-classes = tuple([i for i in range(10)])
+  classes = tuple([i for i in range(10)])
 
-net = CNN(28, 28, 1, 10, 4) # dimensions hardcoded for MNIST
+  net = CNN(28, 28, 1, 10, 4) # dimensions hardcoded for MNIST
+  #net_state_dict = net.state_dict()
+  #for name, params in net_state_dict.items():
+  #  print("Params for {}: {}".format(name, params))
 
-# Literally, all this is is adding a softmax on the outputs of the neural network (because the outputs
-# are "weights" corresponding to each class) to produce probabilities for each class and then takes
-# the loss to be the negative log of the probability of the correct class (we want to maximize the
-# probability, which is equivalent to minimizing the negative log of the probability). Thus, instead
-# of adding a softmax layer to the neural net architecture, we just do the softmax in the loss function.
-# Maybe it's more convenient this way but seems to be the standard.
-criterion = nn.CrossEntropyLoss()
-#optimizer = optim.Adam(net.parameters()) # TODO: somehow training the CNN didn't work when using this; need to figure out why
-optimizer = optim.SGD(net.parameters(), lr=sgd_lr, momentum=0.9)
+  # Literally, all this is is adding a softmax on the outputs of the neural network (because the outputs
+  # are "weights" corresponding to each class) to produce probabilities for each class and then takes
+  # the loss to be the negative log of the probability of the correct class (we want to maximize the
+  # probability, which is equivalent to minimizing the negative log of the probability). Thus, instead
+  # of adding a softmax layer to the neural net architecture, we just do the softmax in the loss function.
+  # Maybe it's more convenient this way but seems to be the standard.
+  criterion = nn.CrossEntropyLoss()
+  #optimizer = optim.Adam(net.parameters()) # TODO: somehow training the CNN didn't work when using this; need to figure out why
+  optimizer = optim.SGD(net.parameters(), lr=sgd_lr, momentum=0.9)
 
-train_net_via_backprop(net, trainloader, optimizer, criterion, epochs) # 04/20/2018: 9768 correct out of 10000 achieved using backprop without maxpooling
-#train_net_via_ES(net, trainloader, es_var, es_lr, es_pop_size, criterion, epochs)
-evaluate_net(net, testloader)
+  #train_net_via_backprop(net, trainloader, optimizer, criterion, epochs) # Best: 9827 correct out of 10000 achieved using backprop without maxpooling
+  train_net_via_ES(net, trainloader, es_std_dev, es_lr, es_pop_size, criterion, epochs)
+  evaluate_net(net, testloader)
 
