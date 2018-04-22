@@ -129,12 +129,13 @@ def train_net_via_ES(net, trainloader, std_dev, lr, pop_size, criterion, epochs,
       net_state_dict = net.state_dict() 
       seeds = seed_generator.randint(low=0, high=max_seed, size=pop_size)
       perturbations = [get_net_perturbations(net_state_dict, seeds[j]) for j in range(pop_size)]
-      """
+      
       # code not using multiprocessing
       scores = [1.0] * pop_size
       for j in range(pop_size):
         perturbation = perturbations[j]
         score_perturbation(net, perturbation, inputs, labels, criterion, scores, j, std_dev)
+      
       """
       # code using multiprocessing
       manager = mp.Manager()
@@ -154,7 +155,7 @@ def train_net_via_ES(net, trainloader, std_dev, lr, pop_size, criterion, epochs,
         processes.append(p)
       for p in processes:
         p.join()
-      
+      """
       scores = np.array(scores)
       scores = scores / sum(scores) # TODO: normalization that isn't explicitly represented in original ES
       net.load_state_dict(average_nets_ES(net_state_dict, perturbations, scores, std_dev, lr))
@@ -182,9 +183,9 @@ if __name__ == "__main__":
   if len(sys.argv) > 1 and sys.argv[1] == "ES": # default training to backprop
     # try larger batch size just for ES training as otherwise, too much
     # multiprocessing overhead
-    train_batch = 500
+    train_batch = 100
   test_batch = 1
-  epochs = 1
+  epochs = 5
   es_lr = 0.1
   sgd_lr = 0.001
   es_std_dev = 0.1 # TODO: not really sure how to set this
@@ -225,8 +226,10 @@ if __name__ == "__main__":
   optimizer = optim.SGD(net.parameters(), lr=sgd_lr, momentum=0.9)
 
   if len(sys.argv) > 1 and sys.argv[1] == "ES":
+    print "Training CNN with ES..."
     train_net_via_ES(net, trainloader, es_std_dev, es_lr, es_pop_size, criterion, epochs)
   else:
+    print "Training CNN with Backprop..."
     train_net_via_backprop(net, trainloader, optimizer, criterion, epochs) # Best: 9827 correct out of 10000 achieved using backprop without maxpooling
   evaluate_net(net, testloader)
 
