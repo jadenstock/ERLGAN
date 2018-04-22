@@ -226,10 +226,10 @@ if __name__ == "__main__":
   optimizer = optim.SGD(net.parameters(), lr=sgd_lr, momentum=0.9)
 
   if len(sys.argv) > 1 and sys.argv[1] == "ES":
-    print "Training CNN with ES..."
+    print("Training CNN with ES...")
     train_net_via_ES(net, trainloader, es_std_dev, es_lr, es_pop_size, criterion, epochs)
   else:
-    print "Training CNN with Backprop..."
+    print("Training CNN with Backprop...")
     train_net_via_backprop(net, trainloader, optimizer, criterion, epochs) # Best: 9827 correct out of 10000 achieved using backprop without maxpooling
   evaluate_net(net, testloader)
 
