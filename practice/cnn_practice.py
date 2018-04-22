@@ -113,9 +113,12 @@ def score_net_ES(net, inputs, labels, criterion):
 
 def average_nets_ES(net_state_dict, perturbations, scores, std_dev, lr):
   new_net = {}
+  pop_size = len(perturbations)
   for name, params in net_state_dict.items():
-    new_net[name] = (lr / (len(perturbations) * std_dev)) * sum([scores[i] * perturbations[i][name] for i in range(len(perturbations))])
-    new_net[name].add_(params)
+    new_net[name] = params.clone()
+    for j in range(len(perturbations)):
+      next_perturbation = (lr / (pop_size * std_dev)) * scores[j] * perturbations[j][name]
+      new_net[name].add_(next_perturbation)
   return new_net
 
 # TODO: NEED TO PARALLELIZE OR THIS WILL TAKE FOREVER
@@ -157,7 +160,15 @@ def train_net_via_ES(net, trainloader, std_dev, lr, pop_size, criterion, epochs,
         p.join()
       """
       scores = np.array(scores)
-      scores = scores / sum(scores) # TODO: normalization that isn't explicitly represented in original ES
+      # TODO: Here is something to understand better. In the case of negative cross entropy,
+      # the reward is always negative and we're trying to maximize it. One can think of
+      # negative reward as a force pushing our solution away from "more negative" reward
+      # regions, while positive reward is a force "pulling" our solution towards "more
+      # positive" reward regions. But it's still feels strange to use the same updates
+      # regardless of the type of reward, so long as our goal is maximize it. Shouldn't
+      # there be some kind of normalization?
+#      scores = scores / sum(scores) # normalization that isn't explicitly represented in original ES
+#      scores = scores - np.mean(scores) # another normalization that isn't explicitly represented in original ES
       net.load_state_dict(average_nets_ES(net_state_dict, perturbations, scores, std_dev, lr))
       current_loss = score_net_ES(net, inputs, labels, criterion)
       if i % 10 == (10 - 1):
@@ -186,7 +197,7 @@ if __name__ == "__main__":
     train_batch = 100
   test_batch = 1
   epochs = 5
-  es_lr = 0.1
+  es_lr = 0.001
   sgd_lr = 0.001
   es_std_dev = 0.1 # TODO: not really sure how to set this
   es_pop_size = 100 # TODO: also not really sure how to set this
