@@ -28,9 +28,9 @@ class DistributionGenerator(nn.Module):
         self.fc3_lin = nn.Linear(hidden_dim, output_dim)
 
     def forward(self, x):
-        x = self.f1_nonlin(self.fc1_lin(x))
-        x = self.f2_nonlin(self.fc2_lin(x))
-        x = self.f3_lin(x)
+        x = self.fc1_nonlin(self.fc1_lin(x))
+        x = self.fc2_nonlin(self.fc2_lin(x))
+        x = self.fc3_lin(x)
         return x
 
     def generate_sample(self):
@@ -55,10 +55,12 @@ class DistributionDiscriminator(nn.Module):
         # output of the final linear layer; but it's nice to have a probability distribution
         self.make_prob = nn.Softmax 
 
+    # NOTE: let's use the convention that index 0 means NOT from true distribution and
+    # index 1 means from true distribution
     def forward(self, x):
         x = self.f1_nonlin(self.fc1_lin(x))
         x = self.f2_nonlin(self.fc2_lin(x))
-        x = self.make_prob(self.f3_lin(x))
+        x = self.make_prob(self.fc3_lin(x))
         return x
 
     def discriminate_sample(self, candidate_sample):
@@ -80,15 +82,20 @@ class DistributionGAN:
         self.discriminator = DistributionDiscriminator(sample_dim, dis_hidden_dim)
 
     # train using vanilla Jensen-Shannon divergence/KL divergence (see vanilla GAN)
-    def jensen_shannon_train(self):
+    def jensen_shannon_train(self, d_optimizer, g_optimizer, epochs, dsteps_per_gstep, batch_size):
         pass # TODO
 
-    # train using wasserstein L1 distance (see WGAN)
-    def wasserstein_train(self):
+    # train using wasserstein L1 distance (see vanilla WGAN) and naive clipping procedure
+    # to maintain Lipschitz condition
+    def wasserstein_train_basic(self, d_optimizer, g_optimizer, epochs, dsteps_per_gstep, batch_size, clipping):
+        pass # TODO
+
+    # also train using wasserstein L1 distance but with https://arxiv.org/abs/1704.00028
+    def wasserstein_train_adv(self, d_optimizer, g_optimizer, epochs, dsteps_per_gstep, batch_size):
         pass # TODO
 
     # train using least squares divergence (see LSGAN)
-    def least_squares_train(self):
+    def least_squares_train(self, d_optimizer, g_optimizer, epochs, dsteps_per_gstep, batch_size):
         pass # TODO
 
 if __name__ == "__main__":
