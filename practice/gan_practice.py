@@ -13,9 +13,12 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 # plotting
+import matplotlib as mpl
+mpl.use('Agg')
 import matplotlib.pyplot as plt
 from collections import Counter
 from scipy import stats
+#import progressbar # Jaden?
 
 class DistributionGenerator(nn.Module):
 
@@ -126,7 +129,7 @@ class DistributionGAN:
                 
                 # compute the loss and take optimizer step
                 d_loss = discriminator_loss(true_outputs, fake_outputs)
-                print("d_loss: {}".format(d_loss))
+            #    print("d_loss: {}".format(d_loss))
                 d_loss.backward()
                 d_optimizer.step()
             if printing: print("discriminator trained...", end="")
@@ -143,7 +146,7 @@ class DistributionGAN:
             # generator update
             fake_outputs = self.discriminator.forward(fake_batch)
             g_loss = generator_loss(fake_outputs)
-            print("g_loss: {}".format(g_loss))
+#            print("g_loss: {}".format(g_loss))
 
             g_loss.backward()
             g_optimizer.step()
@@ -170,9 +173,13 @@ if __name__ == "__main__":
     sample_dim = 1 # dimensionality of generator output (and target distribution)
     gen_hidden_dim = 20 # hidden layer size for generator
     dis_hidden_dim = 20 # hidden layer size for discriminator
+    df = 4
+    epochs = 10000
+    dsteps_per_gstep = 10
+    batch_size = 10
 
     input_noise_distribution = lambda : np.random.normal(loc=0.0, scale=1.0, size=noise_dim)
-    target_distribution = lambda : np.random.chisquare(df=10, size=sample_dim)
+    target_distribution = lambda : np.random.chisquare(df=df, size=sample_dim)
 
     gan = DistributionGAN(input_noise_distribution, target_distribution,
                           noise_dim, sample_dim, gen_hidden_dim, dis_hidden_dim)
@@ -180,19 +187,22 @@ if __name__ == "__main__":
     # train
     d_optimizer = optim.SGD(gan.discriminator.parameters(), lr=0.001, momentum=0.9)
     g_optimizer = optim.SGD(gan.generator.parameters(), lr=0.001, momentum=0.9)
-    gan.jensen_shannon_train(d_optimizer, g_optimizer, 1000, 1, 10)
+    gan.jensen_shannon_train(d_optimizer, g_optimizer, epochs, dsteps_per_gstep, batch_size, printing=False)
 
     # generate
-    noise_samples = [input_noise_distribution() for _ in range(1000)]
+    num_samples = 50000
+    noise_samples = Variable(torch.FloatTensor([input_noise_distribution() for _ in range(num_samples)]))
     fake_samples = gan.generator(noise_samples).data.numpy()
-    binned_fake_samples = np.around(fake_samples, decimals=2)
-    histogram = Counter(binned_fake_samples)    
+    binned_fake_samples = np.around(fake_samples, decimals=0)
+    binned_fake_samples = [arr[0] for arr in binned_fake_samples]
+    histogram = Counter(binned_fake_samples)
     x, y = zip(*histogram.items())
-    y = y/sum(y)
+    y = np.array(y)
+    y = y / sum(y)
 
     # plot
-    plt.plot(x, y)
-    chi_xs = np.linspace(0, 5, 1000)
-    plt.plot(chi_xs, stats.chi2.pdf(chi_xs))
-    plt.show()
+    plt.scatter(x, y)
+    chi_xs = np.linspace(0, max(x), 1000)
+    plt.plot(chi_xs, stats.chi2.pdf(chi_xs, df))
+    plt.savefig("chi_squared_gan_vis.png")
 
