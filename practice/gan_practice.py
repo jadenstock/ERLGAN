@@ -12,6 +12,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
+# plotting
+import matplotlib.pyplot as plt
+from collections import Counter
+from scipy import stats
+
 class DistributionGenerator(nn.Module):
 
     def __init__(self, input_noise_distribution, input_dim, output_dim, hidden_dim):
@@ -161,8 +166,8 @@ class DistributionGAN:
         pass # TODO
 
 if __name__ == "__main__":
-    noise_dim = 10 # dimensionality of noise distribution
-    sample_dim = 10 # dimensionality of generator output (and target distribution)
+    noise_dim = 1 # dimensionality of noise distribution
+    sample_dim = 1 # dimensionality of generator output (and target distribution)
     gen_hidden_dim = 20 # hidden layer size for generator
     dis_hidden_dim = 20 # hidden layer size for discriminator
 
@@ -172,8 +177,22 @@ if __name__ == "__main__":
     gan = DistributionGAN(input_noise_distribution, target_distribution,
                           noise_dim, sample_dim, gen_hidden_dim, dis_hidden_dim)
 
+    # train
     d_optimizer = optim.SGD(gan.discriminator.parameters(), lr=0.001, momentum=0.9)
     g_optimizer = optim.SGD(gan.generator.parameters(), lr=0.001, momentum=0.9)
-    # d_optimizer, g_optimizer, epochs, dsteps_per_gstep, batch_size
     gan.jensen_shannon_train(d_optimizer, g_optimizer, 1000, 1, 10)
+
+    # generate
+    noise_samples = [input_noise_distribution() for _ in range(1000)]
+    fake_samples = gan.generator(noise_samples).data.numpy()
+    binned_fake_samples = np.around(fake_samples, decimals=2)
+    histogram = Counter(binned_fake_samples)    
+    x, y = zip(*histogram.items())
+    y = y/sum(y)
+
+    # plot
+    plt.plot(x, y)
+    chi_xs = np.linspace(0, 5, 1000)
+    plt.plot(chi_xs, stats.chi2.pdf(chi_xs))
+    plt.show()
 
