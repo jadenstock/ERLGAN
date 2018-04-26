@@ -82,8 +82,6 @@ class DistributionGAN:
                  dis_hidden_dim):
         self.input_noise_distribution = input_noise_distribution
         self.target_distribution = target_distribution
-        self.noise_dim = noise_dim
-        self.sample_dim = sample_dim
         self.generator = DistributionGenerator(input_noise_distribution, noise_dim, sample_dim, gen_hidden_dim)
         self.discriminator = DistributionDiscriminator(sample_dim, dis_hidden_dim)
 
@@ -113,11 +111,11 @@ class DistributionGAN:
                 d_optimizer.zero_grad()
 
                 # train on real data
-                true_batch = Variable(torch.FloatTensor([self.target_distribution(self.sample_dim) for _ in range(batch_size)]))
+                true_batch = Variable(torch.FloatTensor([self.target_distribution() for _ in range(batch_size)]))
                 true_outputs = self.discriminator.forward(true_batch)
 
                 # train on fake data
-                noise_samples = Variable(torch.FloatTensor([self.input_noise_distribution(self.noise_dim) for _ in range(batch_size)]))
+                noise_samples = Variable(torch.FloatTensor([self.input_noise_distribution() for _ in range(batch_size)]))
                 fake_batch = self.generator(noise_samples)
                 fake_outputs = self.discriminator.forward(fake_batch)
                 
@@ -134,7 +132,7 @@ class DistributionGAN:
             g_optimizer.zero_grad()
 
             # generate samples
-            noise_samples = Variable(torch.FloatTensor([self.input_noise_distribution(self.noise_dim) for _ in range(batch_size)]))
+            noise_samples = Variable(torch.FloatTensor([self.input_noise_distribution() for _ in range(batch_size)]))
             fake_batch = self.generator(noise_samples)
 
             # generator update
@@ -163,13 +161,13 @@ class DistributionGAN:
         pass # TODO
 
 if __name__ == "__main__":
-    input_noise_distribution = lambda size : np.random.normal(loc=0.0, scale=1.0, size=size)
-    target_distribution = lambda size : np.random.chisquare(df=10, size=size)
-
     noise_dim = 10 # dimensionality of noise distribution
     sample_dim = 10 # dimensionality of generator output (and target distribution)
     gen_hidden_dim = 20 # hidden layer size for generator
     dis_hidden_dim = 20 # hidden layer size for discriminator
+
+    input_noise_distribution = lambda : np.random.normal(loc=0.0, scale=1.0, size=noise_dim)
+    target_distribution = lambda : np.random.chisquare(df=10, size=sample_dim)
 
     gan = DistributionGAN(input_noise_distribution, target_distribution,
                           noise_dim, sample_dim, gen_hidden_dim, dis_hidden_dim)
