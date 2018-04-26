@@ -2,8 +2,8 @@
 import numpy as np
 import multiprocessing as mp
 import sys
-from scipy.stats import entropy
-from numpy.linalg import norm
+#from scipy.stats import entropy
+#from numpy.linalg import norm
 
 # torch autograd, nn, etc.
 import torch
@@ -18,10 +18,9 @@ mpl.use('Agg')
 import matplotlib.pyplot as plt
 from collections import Counter
 from scipy import stats
-#import progressbar
 
 class DistributionGenerator(nn.Module):
-
+    # currently just a basic neural network with one hidden layer
     def __init__(self, input_noise_distribution, input_dim, output_dim, hidden_dim):
         super(DistributionGenerator, self).__init__()
         self.input_noise_distribution = input_noise_distribution
@@ -43,13 +42,12 @@ class DistributionGenerator(nn.Module):
         x = self.fc3_lin(x)
         return x
 
-    def generate_sample(self):
-        x = self.input_noise_distribution(input_size)
-        return self.forward(x)
+    def generate_samples(self, n):
+        noise_samples = Variable(torch.FloatTensor([self.input_noise_distribution() for _ in range(n)]))
+        return self.forward(noise_samples)
 
 class DistributionDiscriminator(nn.Module):
     # currently just a basic neural network with one hidden layer
-
     def __init__(self, input_dim, hidden_dim):
         super(DistributionDiscriminator, self).__init__()
         self.input_dim = input_dim
@@ -82,8 +80,8 @@ class DistributionDiscriminator(nn.Module):
 class DistributionGAN:
 
     def __init__(self,
-                 input_noise_distribution,  # a function of size -> vector
-                 target_distribution,       # a function of size -> vector
+                 input_noise_distribution,  # a function of no arguments that produces a noise vector
+                 target_distribution,       # a function of no arguments that samples from the target distribution
                  noise_dim,                 # the dimension of noise to generator
                  sample_dim,                # the dimension of generator output/discriminator input
                  gen_hidden_dim,            
@@ -95,11 +93,9 @@ class DistributionGAN:
 
     # train using vanilla Jensen-Shannon divergence/KL divergence (see vanilla GAN)
     # (see also https://github.com/devnag/pytorch-generative-adversarial-networks/blob/master/gan_pytorch.py)
-    def jensen_shannon_train(self, d_optimizer, g_optimizer, epochs, dsteps_per_gstep, batch_size, printing = True):
+    def jensen_shannon_train(self, d_optimizer, g_optimizer, epochs, dsteps_per_gstep, batch_size, printing = False):
 
         def discriminator_loss(doutputs_true, doutputs_fake):
-            #print("Truth:{}".format(doutputs_true))
-            #print("Fake:{}".format(doutputs_fake))
             losses_true = torch.log(doutputs_true)
             losses_fake = torch.log(1.0 - doutputs_fake) # 1.0 minus each element
             return -torch.mean(losses_true + losses_fake)
@@ -110,15 +106,20 @@ class DistributionGAN:
             losses_fake = torch.log(1.0 - doutputs_fake) # 1.0 minus each element
             return torch.mean(losses_fake)
 
-#        bar = progressbar.ProgressBar(maxval = 20, \
-#          widgets=[progressbar.Bar('#', '[', ']'), ' ', progressbar.Percentage()])
-#        bar.start()
-#        i=0
+        print("Training GAN: ", end="")
+        progress_bar_width = 50
+        # setup toolbar
+        sys.stdout.write("[%s]" % (" " * progress_bar_width))
+        sys.stdout.flush()
+        sys.stdout.write("\b" * (progress_bar_width+1)) # return to start of line, after '['
 
         for epoch in range(epochs):
-#            if epoch%int(epochs/20)==0: bar.update(++i)
+            if epoch%(int(epochs/progress_bar_width)) == 0:
+                sys.stdout.write("#")
+                sys.stdout.flush()
 
-            if printing: print("epoch {}...".format(epoch), end="")
+            if printing: print("epoch {}...".format(epoch))
+
             # ------------------------
             # Train the discriminator
             # ------------------------
@@ -136,33 +137,23 @@ class DistributionGAN:
                 
                 # compute the loss and take optimizer step
                 d_loss = discriminator_loss(true_outputs, fake_outputs)
-            #    print("d_loss: {}".format(d_loss))
                 d_loss.backward()
                 d_optimizer.step()
-            if printing: print("discriminator trained...", end="")
 
             # ------------------------
             # Train the generator
             # ------------------------
             g_optimizer.zero_grad()
 
-            # generate samples
-            noise_samples = Variable(torch.FloatTensor([self.input_noise_distribution() for _ in range(batch_size)]))
-            fake_batch = self.generator(noise_samples)
-
-            # generator update
+            # generate samples and perform an update
+            fake_batch = self.generator.generate_samples(batch_size)
             fake_outputs = self.discriminator.forward(fake_batch)
             g_loss = generator_loss(fake_outputs)
-#            print("g_loss: {}".format(g_loss))
-
             g_loss.backward()
             g_optimizer.step()
-            
-            if printing: print("generator trained...", end="")
 
-            if printing: print("\nJensen-Shannon loss is {}".format(0))
+        sys.stdout.write("\n")
 
-#        bar.finish()
     # train using wasserstein L1 distance (see vanilla WGAN) and naive clipping procedure
     # to maintain Lipschitz condition
     def wasserstein_train_basic(self, d_optimizer, g_optimizer, epochs, dsteps_per_gstep, batch_size, clipping):
@@ -176,15 +167,121 @@ class DistributionGAN:
     def least_squares_train(self, d_optimizer, g_optimizer, epochs, dsteps_per_gstep, batch_size):
         pass # TODO
 
+class ImageDiscriminator(nn.Module):
+
+  # convolutional neural network
+  def __init__(self, input_height, input_width, input_channels, output_dim, conv_dim):
+    super(CNN, self).__init__()
+    # pass these in to make it more "customizable"
+    self.input_height = input_height
+    self.input_width = input_width
+    self.output_dim = output_dim
+    self.conv_dim = conv_dim
+    self.input_channels = input_channels
+    
+    # some things to play with
+    self.fc1_out_dim = 30
+    self.fc2_out_dim = 30
+    self.conv1_output_channels = 3
+    self.conv2_output_channels = 5
+    
+    self.dim_after_convs = (self.conv2_output_channels * (input_height - 2 * (conv_dim - 1)) ** 2)
+
+    self.conv1 = nn.Conv2d(input_channels, self.conv1_output_channels, conv_dim)
+    #self.pool = nn.MaxPool2d(2, 2) # ignore for now
+    self.conv2 = nn.Conv2d(self.conv1_output_channels, self.conv2_output_channels, conv_dim)
+    # NOTE: fc stands for "fully-connected
+    self.conv_nonlin = F.relu # cuz why not
+    self.fc_nonlin = F.elu # cuz why not
+    self.fc1 = nn.Linear(self.dim_after_convs, self.fc1_out_dim)
+    self.fc2 = nn.Linear(self.fc1_out_dim, self.fc2_out_dim)
+    self.fc3 = nn.Linear(self.fc2_out_dim, output_dim)
+
+  def forward(self, x):
+    # x = self.pool(self.conv_nonlin(self.conv1(x)))
+    # x = self.pool(self.conv_nonlin(self.conv2(x)))
+    x = self.conv_nonlin(self.conv1(x))
+    x = self.conv_nonlin(self.conv2(x))
+    x = x.view(-1, self.dim_after_convs) # compress into a vector
+    x = self.fc_nonlin(self.fc1(x))
+    x = self.fc_nonlin(self.fc2(x))
+    x = self.fc3(x)
+    return x
+
+class ImageGenerator(nn.Module):
+
+  # convolutional neural network
+  def __init__(self, input_height, input_width, input_channels, output_dim, conv_dim):
+    super(CNN, self).__init__()
+    # pass these in to make it more "customizable"
+    self.input_height = input_height
+    self.input_width = input_width
+    self.output_dim = output_dim
+    self.conv_dim = conv_dim
+    self.input_channels = input_channels
+    
+    # some things to play with
+    self.fc1_out_dim = 30
+    self.fc2_out_dim = 30
+    self.conv1_output_channels = 3
+    self.conv2_output_channels = 5
+    
+    self.dim_after_convs = (self.conv2_output_channels * (input_height - 2 * (conv_dim - 1)) ** 2)
+
+    self.conv1 = nn.Conv2d(input_channels, self.conv1_output_channels, conv_dim)
+    #self.pool = nn.MaxPool2d(2, 2) # ignore for now
+    self.conv2 = nn.Conv2d(self.conv1_output_channels, self.conv2_output_channels, conv_dim)
+    # NOTE: fc stands for "fully-connected
+    self.conv_nonlin = F.relu # cuz why not
+    self.fc_nonlin = F.elu # cuz why not
+    self.fc1 = nn.Linear(self.dim_after_convs, self.fc1_out_dim)
+    self.fc2 = nn.Linear(self.fc1_out_dim, self.fc2_out_dim)
+    self.fc3 = nn.Linear(self.fc2_out_dim, output_dim)
+
+  def forward(self, x):
+    # x = self.pool(self.conv_nonlin(self.conv1(x)))
+    # x = self.pool(self.conv_nonlin(self.conv2(x)))
+    x = self.conv_nonlin(self.conv1(x))
+    x = self.conv_nonlin(self.conv2(x))
+    x = x.view(-1, self.dim_after_convs) # compress into a vector
+    x = self.fc_nonlin(self.fc1(x))
+    x = self.fc_nonlin(self.fc2(x))
+    x = self.fc3(x)
+    return x
+
+class ConvolutionGAN:
+
+  def __init__(self,
+                 input_noise_distribution,  # a function of size -> vector
+                 target_distribution,       # a function of size -> vector
+                 noise_dim,                 # the dimension of noise to generator
+                 sample_dim,                # the dimension of generator output/discriminator input
+                 gen_hidden_dim,            
+                 dis_hidden_dim):
+        self.input_noise_distribution = input_noise_distribution
+        self.target_distribution = target_distribution
+        self.generator = ImageGenerator()
+
+        # input_height, input_width, input_channels, output_dim, conv_dim
+        self.discriminator = ImageDiscriminator()
+
+  def jensen_shannon_train(self, d_optimizer, g_optimizer, epochs, dsteps_per_gstep, batch_size, printing = False):
+    pass
+
+
 if __name__ == "__main__":
+  dist = True    # train distribution gan
+  image = False  # train image gan
+
+  if dist:
     noise_dim = 1 # dimensionality of noise distribution
     sample_dim = 1 # dimensionality of generator output (and target distribution)
     gen_hidden_dim = 20 # hidden layer size for generator
     dis_hidden_dim = 20 # hidden layer size for discriminator
-    df = 6
-    epochs = 10000
+    df = 3 # for Chi dist.
+    epochs = 10000 # number of training epochs
     dsteps_per_gstep = 5 # TODO: adaptive dsteps_per_gstep
-    batch_size = 10
+    batch_size = 10 # bacth size per step
 
     input_noise_distribution = lambda : np.random.normal(loc=0.0, scale=1.0, size=noise_dim)
     target_distribution = lambda : np.random.chisquare(df=df, size=sample_dim)
@@ -198,7 +295,7 @@ if __name__ == "__main__":
     gan.jensen_shannon_train(d_optimizer, g_optimizer, epochs, dsteps_per_gstep, batch_size, printing=False)
 
     # generate
-    num_samples = 50000
+    num_samples = 300000
     noise_samples = Variable(torch.FloatTensor([input_noise_distribution() for _ in range(num_samples)]))
     fake_samples = gan.generator(noise_samples).data.numpy()
     binned_fake_samples = np.around(fake_samples, decimals=0)
@@ -214,3 +311,12 @@ if __name__ == "__main__":
     plt.plot(chi_xs, stats.chi2.pdf(chi_xs, df))
     plt.savefig("chi_squared_gan_vis.png")
 
+  if image:
+    trainset = torchvision.datasets.MNIST(root="./mnist",
+              train=True,
+              download=True,
+              transform=transforms.ToTensor())
+    trainloader = torch.utils.data.DataLoader(trainset,
+              batch_size=train_batch,
+              shuffle=True, #shuffles the data? good
+              num_workers=2)
