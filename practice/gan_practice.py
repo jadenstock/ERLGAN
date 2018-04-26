@@ -57,9 +57,7 @@ class DistributionDiscriminator(nn.Module):
         # NOTE: this isn't strictly necessary because one can just take a max over the
         # output of the final linear layer; but it's nice to have a probability distribution
         
-        #self.make_prob = nn.Softmax
-    def make_prob(self, x):
-        return nn.Softmax(x)
+        self.make_prob = nn.Softmax()
 
     # NOTE: let's use the convention that index 0 means NOT from true distribution and
     # index 1 means from true distribution
@@ -67,7 +65,7 @@ class DistributionDiscriminator(nn.Module):
         x = self.fc1_nonlin(self.fc1_lin(x))
         x = self.fc2_nonlin(self.fc2_lin(x))
         x = self.make_prob(self.fc3_lin(x))
-        return x
+        return x.select(1, 1) # probability of sample coming from truth
 
     def discriminate_sample(self, candidate_sample):
         probs = self.forward(candidate_sample)
@@ -84,6 +82,7 @@ class DistributionGAN:
                  dis_hidden_dim):
         self.input_noise_distribution = input_noise_distribution
         self.target_distribution = target_distribution
+        self.noise_dim = noise_dim
         self.sample_dim = sample_dim
         self.generator = DistributionGenerator(input_noise_distribution, noise_dim, sample_dim, gen_hidden_dim)
         self.discriminator = DistributionDiscriminator(sample_dim, dis_hidden_dim)
@@ -92,7 +91,7 @@ class DistributionGAN:
     # (see also https://github.com/devnag/pytorch-generative-adversarial-networks/blob/master/gan_pytorch.py)
     def jensen_shannon_train(self, d_optimizer, g_optimizer, epochs, dsteps_per_gstep, batch_size, printing = True):
         criterion = nn.BCELoss()
-
+      
         for epoch in range(epochs):
             if printing: print("epoch {}...".format(epoch), end="")
             # ------------------------
@@ -103,12 +102,17 @@ class DistributionGAN:
 
                 # train on real data
                 true_batch = Variable(torch.FloatTensor([self.target_distribution(self.sample_dim) for _ in range(batch_size)]))
-                d_true_error = criterion(self.discriminator.forward(true_batch) , Variable(torch.ones(self.sample_dim)))
+                true_outputs = self.discriminator.forward(true_batch)
+                ones = Variable(torch.ones(batch_size))
+                d_true_error = criterion(true_outputs, ones)
                 d_true_error.backward()
 
                 # train on fake data
-                fake_data = Variable(torch.FloatTensor([self.generator.forward(self.input_noise_distribution(self.sample_dim)) for _ in range(batch_size)]))
-                d_fake_error = criterion(self.discriminator.forward(fake_batch), Variable(torch.zeros(self.sample_dim)))
+                noise_samples = Variable(torch.FloatTensor([self.input_noise_distribution(self.noise_dim) for _ in range(batch_size)]))
+                fake_batch = self.generator(noise_samples)
+                fake_outputs = self.discriminator.forward(fake_batch)
+                zeros = Variable(torch.zeros(batch_size))
+                d_fake_error = criterion(fake_outputs, zeros)
                 d_fake_error.backward()
 
                 d_optimizer.step()
