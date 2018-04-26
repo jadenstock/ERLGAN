@@ -92,8 +92,8 @@ class DistributionGAN:
     def jensen_shannon_train(self, d_optimizer, g_optimizer, epochs, dsteps_per_gstep, batch_size, printing = True):
 
         def discriminator_loss(doutputs_true, doutputs_fake):
-            print("Truth:{}".format(doutputs_true))
-            print("Fake:{}".format(doutputs_fake))
+            #print("Truth:{}".format(doutputs_true))
+            #print("Fake:{}".format(doutputs_fake))
             losses_true = torch.log(doutputs_true)
             losses_fake = torch.log(1.0 - doutputs_fake) # 1.0 minus each element
             return -torch.mean(losses_true + losses_fake)
@@ -109,7 +109,7 @@ class DistributionGAN:
             # ------------------------
             # Train the discriminator
             # ------------------------
-            for _ in range(10):
+            for _ in range(dsteps_per_gstep):
                 d_optimizer.zero_grad()
 
                 # train on real data
@@ -123,6 +123,7 @@ class DistributionGAN:
                 
                 # compute the loss and take optimizer step
                 d_loss = discriminator_loss(true_outputs, fake_outputs)
+                print("d_loss: {}".format(d_loss))
                 d_loss.backward()
                 d_optimizer.step()
             if printing: print("discriminator trained...", end="")
@@ -131,7 +132,19 @@ class DistributionGAN:
             # Train the generator
             # ------------------------
             g_optimizer.zero_grad()
+
+            # generate samples
+            noise_samples = Variable(torch.FloatTensor([self.input_noise_distribution(self.noise_dim) for _ in range(batch_size)]))
+            fake_batch = self.generator(noise_samples)
+
+            # generator update
+            fake_outputs = self.discriminator.forward(fake_batch)
+            g_loss = generator_loss(fake_outputs)
+            print("g_loss: {}".format(g_loss))
+
+            g_loss.backward()
             g_optimizer.step()
+            
             if printing: print("generator trained...", end="")
 
             if printing: print("\nJensen-Shannon loss is {}".format(0))
@@ -164,5 +177,5 @@ if __name__ == "__main__":
     d_optimizer = optim.SGD(gan.discriminator.parameters(), lr=0.001, momentum=0.9)
     g_optimizer = optim.SGD(gan.generator.parameters(), lr=0.001, momentum=0.9)
     # d_optimizer, g_optimizer, epochs, dsteps_per_gstep, batch_size
-    gan.jensen_shannon_train(d_optimizer, g_optimizer, 100, (1,1) ,10)
+    gan.jensen_shannon_train(d_optimizer, g_optimizer, 1000, 1, 10)
 
