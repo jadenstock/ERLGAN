@@ -90,8 +90,20 @@ class DistributionGAN:
     # train using vanilla Jensen-Shannon divergence/KL divergence (see vanilla GAN)
     # (see also https://github.com/devnag/pytorch-generative-adversarial-networks/blob/master/gan_pytorch.py)
     def jensen_shannon_train(self, d_optimizer, g_optimizer, epochs, dsteps_per_gstep, batch_size, printing = True):
-        criterion = nn.BCELoss()
-      
+
+        def discriminator_loss(doutputs_true, doutputs_fake):
+            print("Truth:{}".format(doutputs_true))
+            print("Fake:{}".format(doutputs_fake))
+            losses_true = torch.log(doutputs_true)
+            losses_fake = torch.log(1.0 - doutputs_fake) # 1.0 minus each element
+            return -torch.mean(losses_true + losses_fake)
+
+        # NOTE: this isn't combined with discriminator_loss to produce both losses simultaneously
+        # is because for training the generator, we will resample the noise
+        def generator_loss(doutputs_fake):
+            losses_fake = torch.log(1.0 - doutputs_fake) # 1.0 minus each element
+            return torch.mean(losses_fake)
+
         for epoch in range(epochs):
             if printing: print("epoch {}...".format(epoch), end="")
             # ------------------------
@@ -103,27 +115,23 @@ class DistributionGAN:
                 # train on real data
                 true_batch = Variable(torch.FloatTensor([self.target_distribution(self.sample_dim) for _ in range(batch_size)]))
                 true_outputs = self.discriminator.forward(true_batch)
-                ones = Variable(torch.ones(batch_size))
-                d_true_error = criterion(true_outputs, ones)
-                d_true_error.backward()
 
                 # train on fake data
                 noise_samples = Variable(torch.FloatTensor([self.input_noise_distribution(self.noise_dim) for _ in range(batch_size)]))
                 fake_batch = self.generator(noise_samples)
                 fake_outputs = self.discriminator.forward(fake_batch)
-                zeros = Variable(torch.zeros(batch_size))
-                d_fake_error = criterion(fake_outputs, zeros)
-                d_fake_error.backward()
-
+                
+                # compute the loss and take optimizer step
+                d_loss = discriminator_loss(true_outputs, fake_outputs)
+                d_loss.backward()
                 d_optimizer.step()
             if printing: print("discriminator trained...", end="")
 
             # ------------------------
             # Train the generator
             # ------------------------
-            for _ in range(10):
-                g_optimizer.zero_grad()
-                g_optimizer.step()
+            g_optimizer.zero_grad()
+            g_optimizer.step()
             if printing: print("generator trained...", end="")
 
             if printing: print("\nJensen-Shannon loss is {}".format(0))
