@@ -18,7 +18,7 @@ mpl.use('Agg')
 import matplotlib.pyplot as plt
 from collections import Counter
 from scipy import stats
-#import progressbar # Jaden?
+#import progressbar
 
 class DistributionGenerator(nn.Module):
 
@@ -110,7 +110,14 @@ class DistributionGAN:
             losses_fake = torch.log(1.0 - doutputs_fake) # 1.0 minus each element
             return torch.mean(losses_fake)
 
+#        bar = progressbar.ProgressBar(maxval = 20, \
+#          widgets=[progressbar.Bar('#', '[', ']'), ' ', progressbar.Percentage()])
+#        bar.start()
+#        i=0
+
         for epoch in range(epochs):
+#            if epoch%int(epochs/20)==0: bar.update(++i)
+
             if printing: print("epoch {}...".format(epoch), end="")
             # ------------------------
             # Train the discriminator
@@ -155,6 +162,7 @@ class DistributionGAN:
 
             if printing: print("\nJensen-Shannon loss is {}".format(0))
 
+#        bar.finish()
     # train using wasserstein L1 distance (see vanilla WGAN) and naive clipping procedure
     # to maintain Lipschitz condition
     def wasserstein_train_basic(self, d_optimizer, g_optimizer, epochs, dsteps_per_gstep, batch_size, clipping):
@@ -173,9 +181,9 @@ if __name__ == "__main__":
     sample_dim = 1 # dimensionality of generator output (and target distribution)
     gen_hidden_dim = 20 # hidden layer size for generator
     dis_hidden_dim = 20 # hidden layer size for discriminator
-    df = 4
+    df = 6
     epochs = 10000
-    dsteps_per_gstep = 10
+    dsteps_per_gstep = 5 # TODO: adaptive dsteps_per_gstep
     batch_size = 10
 
     input_noise_distribution = lambda : np.random.normal(loc=0.0, scale=1.0, size=noise_dim)
