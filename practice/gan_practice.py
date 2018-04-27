@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 from collections import Counter
 from scipy import stats
 
+# NOTE: architecture optimize for 1D sampling (smaller network for simple 1D distributions)
 class DistributionGenerator(nn.Module):
     # currently just a basic neural network with one hidden layer
     def __init__(self, input_noise_distribution, input_dim, output_dim, hidden_dim):
@@ -320,10 +321,10 @@ if __name__ == "__main__":
     print("Setting up Distribution GAN...")
     noise_dim = 1 # dimensionality of noise distribution
     sample_dim = 1 # dimensionality of generator output (and target distribution)
-    gen_hidden_dim = 20 # hidden layer size for generator
-    dis_hidden_dim = 20 # hidden layer size for discriminator
+    gen_hidden_dim = 10 # hidden layer size for generator
+    dis_hidden_dim = 10 # hidden layer size for discriminator
     df = 4 # for Chi dist.
-    epochs = 1000 # number of training epochs
+    epochs = 5000 # number of training epochs
     dsteps_per_gstep = 5 # TODO: adaptive dsteps_per_gstep
     batch_size = 10 # bacth size per step
 
@@ -339,10 +340,11 @@ if __name__ == "__main__":
     gan.jensen_shannon_train(d_optimizer, g_optimizer, epochs, dsteps_per_gstep, batch_size, printing=False)
 
     # generate
-    num_samples_list = [10000]
+    num_samples_list = [1000, 10000, 100000]
     tv_dists, p_apxs = test_gan_efficiency(input_noise_distribution, gan.generator, target_distribution, num_samples_list)
-    _, tv_dist = next(iter(tv_dists.items()))
-    _, (p_g_apx, p_t_apx) = next(iter(p_apxs.items()))
+#    _, tv_dist = next(iter(tv_dists.items()))
+#    _, (p_g_apx, p_t_apx) = next(iter(p_apxs.items()))
+    p_g_apx, p_t_apx = p_apxs[num_samples_list[2]]
     p_g_xs, p_g_ys = zip(*p_g_apx.items())
     p_t_xs, p_t_ys = zip(*p_t_apx.items())
 
@@ -352,7 +354,8 @@ if __name__ == "__main__":
     plt.savefig("chi_squared_gan_vis.png")
 
     # tv distance
-    print(tv_dist)
+#    print(tv_dist)
+    print(tv_dists)
 
   if image:
     print("Setting up Image GAN...")
