@@ -166,7 +166,6 @@ class DistributionDiscriminator(nn.Module):
     def generate_true_samples(self, batch_size):
         return Variable(torch.FloatTensor([self.target_distribution() for _ in range(batch_size)]))
 
-
 ### Generator for images ###
 class ImageGenerator(nn.Module):
 
@@ -213,8 +212,11 @@ class ImageGenerator(nn.Module):
 class ImageDiscriminator(nn.Module):
 
   # convolutional neural network
-  def __init__(self, input_height, input_width, input_channels, conv_dim):
+  def __init__(self, target_distribution, input_height, input_width, input_channels, conv_dim):
     super(CNN, self).__init__()
+
+    self.target_distribution = target_distribution
+
     # pass these in to make it more "customizable"
     self.input_height = input_height
     self.input_width = input_width
@@ -248,6 +250,13 @@ class ImageDiscriminator(nn.Module):
     x = nn.softmax(self.fc3(x))
     return x
 
+  def discriminate_sample(self, candidate_sample):
+    probs = self.forward(candidate_sample)
+    return probs.argmax()
+
+  def generate_true_samples(self, batch_size):
+  	return Variable(torch.FloatTensor([self.target_distribution() for _ in range(batch_size)]))
+
 def build_dist_gan(noise_dist,		# sampler for noise distribution
 				   target_dist,		# sampler for target distribution
 				   noise_dim,		# dim of the noise_dist
@@ -258,5 +267,30 @@ def build_dist_gan(noise_dist,		# sampler for noise distribution
 	dist_discriminator = DistributionDiscriminator(target_dist, target_dim, dis_hidden_dim)
 	return GAN(dist_generator, dist_discriminator)
 
-def build_image_gan():
-	pass
+
+def build_image_gan(noise_dist,
+					target_dist,
+					image_height,
+					image_width,
+					channels,
+					output_dim,
+					conv_dim):
+
+	#input height and width for discriminator must match the output height and width for the generator
+	discriminator_input_height = generator_output_height = image_height
+	discriminator_input_width = generator_output_width = image_width
+	discriminator_input_channels = generator_output_channels = channels
+
+	imgage_discriminator = ImageDiscriminator(discriminator_input_height,
+											  discriminator_input_width,
+											  discriminator_input_channels,
+											  conv_dim)
+
+	imgage_generator = ImageGenerator(input_dim,
+									  generator_output_channels,
+									  generator_output_width,
+									  generator_output_height,
+									  hidden_dims,
+									  deconv_dim)
+
+	return GAN(imgage_generator, image_discriminator)
