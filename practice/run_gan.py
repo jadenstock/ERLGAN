@@ -65,4 +65,9 @@ if __name__ == "__main__":
               batch_size=train_batch,
               shuffle=True, #shuffles the data? good
               num_workers=2)
+
+    input_noise_distribution = lambda : np.random.normal(loc=0.0, scale=1.0, size=noise_dim)
+    target_distribution = trainloader()
+
+    image_gan = build_image_gan()
     # TODO: train image gan
