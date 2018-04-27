@@ -170,43 +170,41 @@ class DistributionDiscriminator(nn.Module):
 ### Generator for images ###
 class ImageGenerator(nn.Module):
 
-  # convolutional neural network
-  def __init__(self, input_height, input_width, input_channels, output_dim, conv_dim):
+  # "deconvolutional" network for generating images given noise
+  # NOTE: hidden_dims must have length equal to number of hidden layers minus one
+  def __init__(self, noise_dist, input_dim, output_channels, output_width, output_height, hidden_dims, kernel_dim):
     super(CNN, self).__init__()
     # pass these in to make it more "customizable"
-    self.input_height = input_height
-    self.input_width = input_width
-    self.output_dim = output_dim
-    self.conv_dim = conv_dim
-    self.input_channels = input_channels
-    
-    # some things to play with
-    self.fc1_out_dim = 30
-    self.fc2_out_dim = 30
-    self.conv1_output_channels = 3
-    self.conv2_output_channels = 5
-    
-    self.dim_after_convs = (self.conv2_output_channels * (input_height - 2 * (conv_dim - 1)) ** 2)
+    self.noise_dist = noise_dist
+    self.input_dim = input_dim
+    self.output_channels = output_channels
+    self.output_width = output_width
+    self.output_height = output_height
+    self.hidden_dims = hidden_dims
+    self.kernel_dim = kernel_dim
 
-    self.conv1 = nn.Conv2d(input_channels, self.conv1_output_channels, conv_dim)
-    #self.pool = nn.MaxPool2d(2, 2) # ignore for now
-    self.conv2 = nn.Conv2d(self.conv1_output_channels, self.conv2_output_channels, conv_dim)
+    # compute dimension of last hidden layer before deconvolution
+    self.pre_deconv_width = output_width - 4 * (kernel_dim - 1)
+    self.pre_deconv_height = output_height - 4 * (kernel_dim - 1)
+    
     # NOTE: fc stands for "fully-connected
-    self.conv_nonlin = F.relu # cuz why not
-    self.fc_nonlin = F.elu # cuz why not
-    self.fc1 = nn.Linear(self.dim_after_convs, self.fc1_out_dim)
-    self.fc2 = nn.Linear(self.fc1_out_dim, self.fc2_out_dim)
-    self.fc3 = nn.Linear(self.fc2_out_dim, output_dim)
+    self.fc1_nonlin = F.elu # cuz why not
+    self.fc2_nonlin = F.relu # cuz why not
+    self.fc1 = nn.Linear(input_dim, hidden_dims[0])
+    self.fc2 = nn.Linear(hidden_dims[0], hidden_dim[1])
+    self.fc3 = nn.Linear(hidden_dim[1], hidden_dim[2])
+
+    # "deconvolution" for producing the images
+    self.deconv1 = nn.ConvTranspose2d(1, output_channels, kernel_dim)
+    self.deconv2 = nn.ConvTranspose2d(output_channels, output_channels, kernel_dim)
 
   def forward(self, x):
-    # x = self.pool(self.conv_nonlin(self.conv1(x)))
-    # x = self.pool(self.conv_nonlin(self.conv2(x)))
-    x = self.conv_nonlin(self.conv1(x))
-    x = self.conv_nonlin(self.conv2(x))
-    x = x.view(-1, self.dim_after_convs) # compress into a vector
-    x = self.fc_nonlin(self.fc1(x))
-    x = self.fc_nonlin(self.fc2(x))
+    x = self.fc1_nonlin(self.fc1(x))
+    x = self.fc2_nonlin(self.fc2(x))
     x = self.fc3(x)
+    x = x.view(-1, self.pre_deconv_width, self.pre_deconv_height)
+    x = self.deconv1(x)
+    x = self.deconv2(x)
     return x
 
 ### Discriminator for images ###
