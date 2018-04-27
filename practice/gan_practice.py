@@ -63,14 +63,14 @@ class DistributionDiscriminator(nn.Module):
         # NOTE: this isn't strictly necessary because one can just take a max over the
         # output of the final linear layer; but it's nice to have a probability distribution
         
-        self.make_prob = nn.Softmax()
+        self.make_prob = F.softmax
 
     # NOTE: let's use the convention that index 0 means NOT from true distribution and
     # index 1 means from true distribution
     def forward(self, x):
         x = self.fc1_nonlin(self.fc1_lin(x))
         x = self.fc2_nonlin(self.fc2_lin(x))
-        x = self.make_prob(self.fc3_lin(x))
+        x = self.make_prob(self.fc3_lin(x), dim=1)
         return x.select(1, 1) # probability of sample coming from truth
 
     def discriminate_sample(self, candidate_sample):
@@ -268,6 +268,49 @@ class ConvolutionGAN:
   def jensen_shannon_train(self, d_optimizer, g_optimizer, epochs, dsteps_per_gstep, batch_size, printing = False):
     pass
 
+# NOTE: only works for finite probability distributions
+# Takes as input two maps which map element to probability.
+def total_variation_distance(p, q):
+    Omega = set()
+    Omega = Omega | p.keys() | q.keys()
+    dist = 0.0
+    for omega in Omega:
+        if omega in p and omega in q:
+            dist += abs(p[omega] - q[omega])
+        elif omega in p:
+            dist += p[omega]
+        elif omega in q:
+            dist += q[omega]
+    return dist / 2.0
+
+def generate_approximate_distribution_from_bins(binned_samples):
+    if type(binned_samples) is not list:
+        binned_samples = list(binned_samples)
+    p_apx = dict(Counter(binned_samples))
+    s = float(sum(p_apx.values()))
+    for key in p_apx.keys():
+        p_apx[key] = p_apx[key] / s
+    return p_apx
+
+# NOTE: currently only works for 1D samples
+def test_gan_efficiency(noise_distribution, generator, target_distribution, num_samples_list, bin_decimal_places=1):
+    tv_dists = {} # for measuring total variation distance
+    p_apxs = {} # useful for plotting
+    for num_samples in num_samples_list:
+        noise_samples = Variable(torch.FloatTensor([input_noise_distribution() for _ in range(num_samples)]))
+        generator_samples = generator(noise_samples).data.numpy()
+        generator_samples = np.array([arr[0] for arr in generator_samples])
+        binned_generator_samples = np.around(generator_samples, decimals=bin_decimal_places)
+        p_g_apx = generate_approximate_distribution_from_bins(binned_generator_samples)
+
+        target_samples = np.array([target_distribution()[0] for _ in range(num_samples)])
+        binned_target_samples = np.around(target_samples, decimals=bin_decimal_places)
+        p_t_apx = generate_approximate_distribution_from_bins(binned_target_samples)
+        tv_dist = total_variation_distance(p_g_apx, p_t_apx)
+
+        tv_dists[num_samples] = tv_dist
+        p_apxs[num_samples] = (p_g_apx, p_t_apx)
+    return tv_dists, p_apxs
 
 if __name__ == "__main__":
   dist = "dist" in sys.argv    # train distribution gan
@@ -279,8 +322,8 @@ if __name__ == "__main__":
     sample_dim = 1 # dimensionality of generator output (and target distribution)
     gen_hidden_dim = 20 # hidden layer size for generator
     dis_hidden_dim = 20 # hidden layer size for discriminator
-    df = 3 # for Chi dist.
-    epochs = 10000 # number of training epochs
+    df = 4 # for Chi dist.
+    epochs = 1000 # number of training epochs
     dsteps_per_gstep = 5 # TODO: adaptive dsteps_per_gstep
     batch_size = 10 # bacth size per step
 
@@ -293,25 +336,23 @@ if __name__ == "__main__":
     # train
     d_optimizer = optim.SGD(gan.discriminator.parameters(), lr=0.001, momentum=0.9)
     g_optimizer = optim.SGD(gan.generator.parameters(), lr=0.001, momentum=0.9)
-    print("Training Distribution GAN...")
     gan.jensen_shannon_train(d_optimizer, g_optimizer, epochs, dsteps_per_gstep, batch_size, printing=False)
 
     # generate
-    num_samples = 300000
-    noise_samples = Variable(torch.FloatTensor([input_noise_distribution() for _ in range(num_samples)]))
-    fake_samples = gan.generator(noise_samples).data.numpy()
-    binned_fake_samples = np.around(fake_samples, decimals=0)
-    binned_fake_samples = [arr[0] for arr in binned_fake_samples]
-    histogram = Counter(binned_fake_samples)
-    x, y = zip(*histogram.items())
-    y = np.array(y)
-    y = y / sum(y)
+    num_samples_list = [10000]
+    tv_dists, p_apxs = test_gan_efficiency(input_noise_distribution, gan.generator, target_distribution, num_samples_list)
+    _, tv_dist = next(iter(tv_dists.items()))
+    _, (p_g_apx, p_t_apx) = next(iter(p_apxs.items()))
+    p_g_xs, p_g_ys = zip(*p_g_apx.items())
+    p_t_xs, p_t_ys = zip(*p_t_apx.items())
 
     # plot
-    plt.scatter(x, y)
-    chi_xs = np.linspace(0, max(x), 1000)
-    plt.plot(chi_xs, stats.chi2.pdf(chi_xs, df))
+    plt.scatter(p_g_xs, p_g_ys, color='b')
+    plt.scatter(p_t_xs, p_t_ys, color='r')
     plt.savefig("chi_squared_gan_vis.png")
+
+    # tv distance
+    print(tv_dist)
 
   if image:
     print("Setting up Image GAN...")
