@@ -43,14 +43,15 @@ class DistributionGenerator(nn.Module):
         x = self.fc3_lin(x)
         return x
 
-    def generate_samples(self, n):
-        noise_samples = Variable(torch.FloatTensor([self.input_noise_distribution() for _ in range(n)]))
+    def generate_samples(self, batch_size):
+        noise_samples = Variable(torch.FloatTensor([self.input_noise_distribution() for _ in range(batch_size)]))
         return self.forward(noise_samples)
 
 class DistributionDiscriminator(nn.Module):
     # currently just a basic neural network with one hidden layer
-    def __init__(self, input_dim, hidden_dim):
+    def __init__(self, target_distribution, input_dim, hidden_dim):
         super(DistributionDiscriminator, self).__init__()
+        self.target_distribution = target_distribution
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
 
@@ -77,6 +78,9 @@ class DistributionDiscriminator(nn.Module):
     def discriminate_sample(self, candidate_sample):
         probs = self.forward(candidate_sample)
         return probs.argmax()
+
+    def generate_true_samples(self, batch_size):
+        return Variable(torch.FloatTensor([self.target_distribution() for _ in range(batch_size)]))
 
 class DistributionGAN:
 
@@ -171,12 +175,12 @@ class DistributionGAN:
 class ImageDiscriminator(nn.Module):
 
   # convolutional neural network
-  def __init__(self, input_height, input_width, input_channels, output_dim, conv_dim):
+  def __init__(self, input_height, input_width, input_channels, conv_dim):
     super(CNN, self).__init__()
     # pass these in to make it more "customizable"
     self.input_height = input_height
     self.input_width = input_width
-    self.output_dim = output_dim
+    self.output_dim = 2
     self.conv_dim = conv_dim
     self.input_channels = input_channels
     
@@ -189,7 +193,6 @@ class ImageDiscriminator(nn.Module):
     self.dim_after_convs = (self.conv2_output_channels * (input_height - 2 * (conv_dim - 1)) ** 2)
 
     self.conv1 = nn.Conv2d(input_channels, self.conv1_output_channels, conv_dim)
-    #self.pool = nn.MaxPool2d(2, 2) # ignore for now
     self.conv2 = nn.Conv2d(self.conv1_output_channels, self.conv2_output_channels, conv_dim)
     # NOTE: fc stands for "fully-connected
     self.conv_nonlin = F.relu # cuz why not
@@ -199,14 +202,12 @@ class ImageDiscriminator(nn.Module):
     self.fc3 = nn.Linear(self.fc2_out_dim, output_dim)
 
   def forward(self, x):
-    # x = self.pool(self.conv_nonlin(self.conv1(x)))
-    # x = self.pool(self.conv_nonlin(self.conv2(x)))
     x = self.conv_nonlin(self.conv1(x))
     x = self.conv_nonlin(self.conv2(x))
     x = x.view(-1, self.dim_after_convs) # compress into a vector
     x = self.fc_nonlin(self.fc1(x))
     x = self.fc_nonlin(self.fc2(x))
-    x = self.fc3(x)
+    x = nn.softmax(self.fc3(x))
     return x
 
 class ImageGenerator(nn.Module):
