@@ -1,6 +1,6 @@
 # other utils
 import numpy as np
-import multiprocessing as mp
+#import multiprocessing as mp
 import sys
 #from scipy.stats import entropy
 #from numpy.linalg import norm
@@ -270,10 +270,11 @@ class ConvolutionGAN:
 
 
 if __name__ == "__main__":
-  dist = True    # train distribution gan
-  image = False  # train image gan
+  dist = "dist" in sys.argv    # train distribution gan
+  image = "image" in sys.argv  # train image gan
 
   if dist:
+    print("Setting up Distribution GAN...")
     noise_dim = 1 # dimensionality of noise distribution
     sample_dim = 1 # dimensionality of generator output (and target distribution)
     gen_hidden_dim = 20 # hidden layer size for generator
@@ -292,6 +293,7 @@ if __name__ == "__main__":
     # train
     d_optimizer = optim.SGD(gan.discriminator.parameters(), lr=0.001, momentum=0.9)
     g_optimizer = optim.SGD(gan.generator.parameters(), lr=0.001, momentum=0.9)
+    print("Training Distribution GAN...")
     gan.jensen_shannon_train(d_optimizer, g_optimizer, epochs, dsteps_per_gstep, batch_size, printing=False)
 
     # generate
@@ -312,6 +314,7 @@ if __name__ == "__main__":
     plt.savefig("chi_squared_gan_vis.png")
 
   if image:
+    print("Setting up Image GAN...")
     trainset = torchvision.datasets.MNIST(root="./mnist",
               train=True,
               download=True,
@@ -320,3 +323,5 @@ if __name__ == "__main__":
               batch_size=train_batch,
               shuffle=True, #shuffles the data? good
               num_workers=2)
+    # TODO: train image gan
+
