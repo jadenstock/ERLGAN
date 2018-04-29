@@ -14,9 +14,11 @@ import torch.utils.data as data
 # distribution is sampled the required number of times during construction
 # and from then on, the samples are fixed for the DataLoader to cycle
 # through them. This is basically inferior in all ways to the "dynamic"
-# dataset below except running time of __getitem__.
+# dataset below except running time of __getitem__ and the "sample
+# complexity"
 #
-# Not sure when this would ever be useful apart from testing (?)
+# Not sure when this would ever be useful apart from testing for our
+# purposes (?)
 class DistributionStaticSamplesDataset(data.Dataset):
 
   def __init__(self, dist_sampler, num_samples):

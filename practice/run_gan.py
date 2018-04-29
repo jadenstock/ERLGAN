@@ -1,11 +1,6 @@
 # other utils
 import numpy as np
 import sys
-
-# plotting
-import matplotlib as mpl
-mpl.use('Agg')
-import matplotlib.pyplot as plt
 from collections import Counter
 from scipy import stats
 
@@ -37,7 +32,7 @@ if __name__ == "__main__":
     dsteps_per_gstep = 5 # TODO: adaptive dsteps_per_gstep
     batch_size = 10 # bacth size per step
 
-    num_samples = 50000
+    num_samples = 10
     noise_dist_sampler = lambda : np.random.normal(loc=0.0, scale=1.0, size=noise_dim)
     target_dist_sampler = lambda : np.random.chisquare(df=df, size=sample_dim)
     
@@ -60,13 +55,9 @@ if __name__ == "__main__":
 #    _, tv_dist = next(iter(tv_dists.items()))
 #    _, (p_g_apx, p_t_apx) = next(iter(p_apxs.items()))
     p_g_apx, p_t_apx = p_apxs[num_samples_list[2]]
-    p_g_xs, p_g_ys = zip(*p_g_apx.items())
-    p_t_xs, p_t_ys = zip(*p_t_apx.items())
 
     # plot
-    plt.scatter(p_g_xs, p_g_ys, color='b')
-    plt.scatter(p_t_xs, p_t_ys, color='r')
-    plt.savefig("chi_squared_gan_vis.png")
+    plot_gan_vs_true_distribution_1D(p_g_apx, p_t_apx, "chi_squared_gan_vis.png")
 
     # tv distance
     print(tv_dists)
