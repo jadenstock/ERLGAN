@@ -9,8 +9,18 @@ import matplotlib.pyplot as plt
 from collections import Counter
 from scipy import stats
 
+# torch data
+import torchvision
+import torchvision.transforms as transforms
+
+# our code
 from gan import *
 from utils import *
+from datasets import *
+
+# fix to a number if needed to aid debug
+seed = None
+np.random.seed(seed)
 
 if __name__ == "__main__":
   dist = "dist" in sys.argv    # train distribution gan
@@ -23,24 +33,30 @@ if __name__ == "__main__":
     gen_hidden_dim = 10 # hidden layer size for generator
     dis_hidden_dim = 10 # hidden layer size for discriminator
     df = 4 # for Chi dist.
-    epochs = 5000 # number of training epochs
+    epochs = 5 # number of training epochs
     dsteps_per_gstep = 5 # TODO: adaptive dsteps_per_gstep
     batch_size = 10 # bacth size per step
 
-    input_noise_distribution = lambda : np.random.normal(loc=0.0, scale=1.0, size=noise_dim)
-    target_distribution = lambda : np.random.chisquare(df=df, size=sample_dim)
-
-    dist_gan = build_dist_gan(input_noise_distribution, target_distribution, 
-    					 noise_dim, sample_dim, gen_hidden_dim, dis_hidden_dim)
+    num_samples = 50000
+    noise_dist_sampler = lambda : np.random.normal(loc=0.0, scale=1.0, size=noise_dim)
+    target_dist_sampler = lambda : np.random.chisquare(df=df, size=sample_dim)
+    
+    target_distribution = DistributionDynamicSamplesDataset(target_dist_sampler, num_samples)
+    target_dist_loader = torch.utils.data.DataLoader(target_distribution,
+              batch_size=batch_size,
+              shuffle=True, #shuffles the data? good
+              num_workers=2)
+    dist_gan = build_dist_gan(noise_dist_sampler, target_dist_loader, 
+    			      noise_dim, sample_dim, gen_hidden_dim, dis_hidden_dim)
 
     # train
-    d_optimizer = optim.SGD(dist_gan.discriminator.parameters(), lr=0.001, momentum=0.9)
     g_optimizer = optim.SGD(dist_gan.generator.parameters(), lr=0.001, momentum=0.9)
-    dist_gan.jensen_shannon_train(d_optimizer, g_optimizer, epochs, dsteps_per_gstep, batch_size, printing=False)
+    d_optimizer = optim.SGD(dist_gan.discriminator.parameters(), lr=0.001, momentum=0.9)
+    dist_gan.jensen_shannon_train(d_optimizer, g_optimizer, epochs, dsteps_per_gstep, printing=False)
 
     # generate
     num_samples_list = [1000, 10000, 100000]
-    tv_dists, p_apxs = test_gan_efficiency(input_noise_distribution, dist_gan.generator, target_distribution, num_samples_list)
+    tv_dists, p_apxs = test_gan_efficiency(noise_dist_sampler, dist_gan.generator, target_dist_sampler, num_samples_list)
 #    _, tv_dist = next(iter(tv_dists.items()))
 #    _, (p_g_apx, p_t_apx) = next(iter(p_apxs.items()))
     p_g_apx, p_t_apx = p_apxs[num_samples_list[2]]
@@ -57,17 +73,41 @@ if __name__ == "__main__":
 
   if image:
     print("Setting up Image GAN...")
-    trainset = torchvision.datasets.MNIST(root="./mnist",
+    noise_dim = 100
+    gen_hidden_dims = [20, 20] # hidden layer sizes for generator
+    dis_hidden_dims = [20, 20] # hidden layer sizes for discriminator
+    epochs = 5 # number of training epochs
+    dsteps_per_gstep = 5 # TODO: adaptive dsteps_per_gstep
+    batch_size = 10 # bacth size per step
+    kernel_dim = 4 # for discriminator convolutions and generator deconvolutions
+
+    ### code special for mnist ###
+    mnist_train_set = torchvision.datasets.MNIST(root="./mnist",
               train=True,
               download=True,
               transform=transforms.ToTensor())
-    trainloader = torch.utils.data.DataLoader(trainset,
-              batch_size=train_batch,
+    mnist_dist_loader = torch.utils.data.DataLoader(mnist_train_set,
+              batch_size=batch_size,
               shuffle=True, #shuffles the data? good
               num_workers=2)
+    image_height = 28
+    image_width = 28
+    channels = 1
+    ##############################
 
-    input_noise_distribution = lambda : np.random.normal(loc=0.0, scale=1.0, size=noise_dim)
-    target_distribution = trainloader()
+    noise_dist_sampler = lambda : np.random.normal(loc=0.0, scale=1.0, size=noise_dim)
 
-    image_gan = build_image_gan()
-    # TODO: train image gan
+    image_gan = build_image_gan(noise_dist_sampler,
+                                mnist_dist_loader,
+                                noise_dim,
+                                image_height,
+                                image_width,
+                                channels,
+                                gen_hidden_dims,
+                                dis_hidden_dims,
+                                kernel_dim)
+    g_optimizer = optim.SGD(image_gan.generator.parameters(), lr=0.001, momentum=0.9)
+    d_optimizer = optim.SGD(image_gan.discriminator.parameters(), lr=0.001, momentum=0.9)
+    image_gan.jensen_shannon_train(d_optimizer, g_optimizer, epochs, dsteps_per_gstep, printing=False)
+
+
