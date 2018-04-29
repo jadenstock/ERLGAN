@@ -19,9 +19,11 @@ from scipy import stats
 
 class GAN:
 
-  def __init__(self, generator, discriminator):
+  def __init__(self, generator, discriminator, name="gan"):
       self.generator = generator
       self.discriminator = discriminator
+      # potentially useful for generating file names for saving models
+      self.name = name
 
   # train using vanilla Jensen-Shannon divergence/KL divergence (see vanilla GAN)
   # (see also https://github.com/devnag/pytorch-generative-adversarial-networks/blob/master/gan_pytorch.py)
@@ -281,10 +283,11 @@ def build_dist_gan(noise_dist_sampler,    # sampler for noise distribution
                    noise_dim,    # dim of the noise distribution
                    target_dim,    # dim of the target distribution
                    gen_hidden_dim,  # hidden dimension size for the generator network
-                   dis_hidden_dim):  # hidden dimension size for the discriminator network
+                   dis_hidden_dim,
+                   name="dist_gan"):  # hidden dimension size for the discriminator network
   dist_generator = DistributionGenerator(noise_dist_sampler, noise_dim, target_dim, gen_hidden_dim)
   dist_discriminator = DistributionDiscriminator(target_dist_loader, target_dim, dis_hidden_dim)
-  return GAN(dist_generator, dist_discriminator)
+  return GAN(dist_generator, dist_discriminator, name)
 
 def build_image_gan(noise_dist_sampler, # sample for noise distribution
                     target_dist_loader, # target distribution
@@ -294,7 +297,8 @@ def build_image_gan(noise_dist_sampler, # sample for noise distribution
                     channels, # number of channels of generator output/discriminator input
                     generator_hidden_dims, # hidden layers dimensions for generator
                     discriminator_hidden_dims, # hidden layers dimensions for discriminator
-                    kernel_dim): # kernel dimensions for conv/deconv
+                    kernel_dim,
+                    name="image_gan"): # kernel dimensions for conv/deconv
 
   #input height and width for discriminator must match the output height and width for the generator
   discriminator_input_height = generator_output_height = image_height
@@ -316,5 +320,5 @@ def build_image_gan(noise_dist_sampler, # sample for noise distribution
                                    generator_hidden_dims,
                                    kernel_dim)
 
-  return GAN(image_generator, image_discriminator)
+  return GAN(image_generator, image_discriminator, name)
 

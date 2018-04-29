@@ -1,6 +1,7 @@
 # other utils
 import numpy as np
 import sys
+import os
 
 # torch autograd, nn, etc.
 import torch
@@ -15,6 +16,9 @@ mpl.use('Agg')
 import matplotlib.pyplot as plt
 from collections import Counter
 from scipy import stats
+
+# all gans
+from gan import *
 
 # NOTE: only works for finite probability distributions
 # Takes as input two maps which map element to probability.
@@ -71,4 +75,28 @@ def plot_gan_vs_true_distribution_1D(p_g_apx, p_t_apx, filename, title=None):
   plt.ylabel("Bin Probabilities")
   plt.legend()
   plt.savefig(filename)
+
+# this is the "recommended" way for saving models
+def save_gan_parameters(gan, dir_path):
+  torch.save(gan.generator.state_dict(), os.path.join(dir_path, gan.name + ".generator_parameters."))
+  torch.save(gan.discriminator.state_dict(), os.path.join(dir_path, gan.name + ".discriminator_parameters."))
+
+# TODO: implement loading gan parameters
+# main challenge is we don't know which type
+# of generator or dscriminator we have so
+# it's hard to initialize the model that will eventually call .load_state_dict
+
+# for now, do quick and dirty
+def save_gan(gan, dir_path):
+  torch.save(gan.generator, os.path.join(dir_path, gan.name + ".generator."))
+  torch.save(gan.discriminator, os.path.join(dir_path, gan.name + ".discriminator."))
+
+def load_gan(name, dir_path):
+  try:
+    g = torch.load(os.path.join(dir_path, name + ".generator."))
+    d = torch.load(os.path.join(dir_path, name + ".discriminator."))
+    return GAN(g, d, name)
+  except:
+    print("Could not load gan \"{}\" from {}".format(name, dir_path))
+    return None
 

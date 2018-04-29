@@ -1,3 +1,4 @@
 /practice/mnist
 /practice/__pycache__
 /practice/*.png
+/practice/models
