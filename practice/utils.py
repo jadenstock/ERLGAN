@@ -20,6 +20,11 @@ from scipy import stats
 # all gans
 from gan import *
 
+# NOTE can be useful for pickling lambda functions
+import dill
+
+##### Model Evaluation Utilities #####
+
 # NOTE: only works for finite probability distributions
 # Takes as input two maps which map element to probability.
 def total_variation_distance(p, q):
@@ -64,6 +69,10 @@ def test_gan_efficiency(noise_distribution, generator, target_distribution, num_
     p_apxs[num_samples] = (p_g_apx, p_t_apx)
   return tv_dists, p_apxs
 
+######################################
+
+##### Plotting Utilities #####
+
 def plot_gan_vs_true_distribution_1D(p_g_apx, p_t_apx, filename, title=None):
   p_g_xs, p_g_ys = zip(*p_g_apx.items())
   p_t_xs, p_t_ys = zip(*p_t_apx.items())
@@ -76,27 +85,38 @@ def plot_gan_vs_true_distribution_1D(p_g_apx, p_t_apx, filename, title=None):
   plt.legend()
   plt.savefig(filename)
 
+def generate_grayscale_image(pixels, filename):
+  plt.imshow(pixels, cmap="gray")
+  plt.savefig(filename)
+
+##############################
+
+##### Model Saving and Loading Utilities #####
+
 # this is the "recommended" way for saving models
 def save_gan_parameters(gan, dir_path):
-  torch.save(gan.generator.state_dict(), os.path.join(dir_path, gan.name + ".generator_parameters."))
-  torch.save(gan.discriminator.state_dict(), os.path.join(dir_path, gan.name + ".discriminator_parameters."))
+  torch.save(gan.generator.state_dict(), os.path.join(dir_path, gan.name + ".generator_parameters.pth"))
+  torch.save(gan.discriminator.state_dict(), os.path.join(dir_path, gan.name + ".discriminator_parameters.pth"))
 
 # TODO: implement loading gan parameters
 # main challenge is we don't know which type
 # of generator or dscriminator we have so
 # it's hard to initialize the model that will eventually call .load_state_dict
 
-# for now, do quick and dirty
+# for now, do quick and dirty. also see
+# https://github.com/pytorch/text/issues/73
+# for torch saving a model that has other fields
 def save_gan(gan, dir_path):
-  torch.save(gan.generator, os.path.join(dir_path, gan.name + ".generator."))
-  torch.save(gan.discriminator, os.path.join(dir_path, gan.name + ".discriminator."))
+  torch.save(gan.generator, os.path.join(dir_path, gan.name + ".generator.pth"), pickle_module=dill)
+  torch.save(gan.discriminator, os.path.join(dir_path, gan.name + ".discriminator.pth"), pickle_module=dill)
 
 def load_gan(name, dir_path):
   try:
-    g = torch.load(os.path.join(dir_path, name + ".generator."))
-    d = torch.load(os.path.join(dir_path, name + ".discriminator."))
+    g = torch.load(os.path.join(dir_path, name + ".generator.pth"))
+    d = torch.load(os.path.join(dir_path, name + ".discriminator.pth"))
     return GAN(g, d, name)
   except:
     print("Could not load gan \"{}\" from {}".format(name, dir_path))
     return None
 
+##############################################

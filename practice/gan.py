@@ -276,7 +276,11 @@ class ImageDiscriminator(nn.Module):
     return probs.argmax()
 
   def generate_true_samples(self, batch_size):
-    return Variable(torch.FloatTensor([self.target_dist_loader.next() for _ in range(batch_size)]))
+    indices = np.random.choice(len(self.target_dist_loader.dataset), size=batch_size, replace=False)
+    # need to extract [0] for each example as each example returned comes with a label
+    samples_seq = [self.target_dist_loader.dataset[idx][0] for idx in indices]
+    # concatenate the tensors along a new dimension corresponding to batch_size
+    return Variable(torch.stack(samples_seq, dim=0))
 
 def build_dist_gan(noise_dist_sampler,    # sampler for noise distribution
                    target_dist_loader,    # target distribution dataset loader
