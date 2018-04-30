@@ -3,6 +3,7 @@ import numpy as np
 import sys
 from collections import Counter
 from scipy import stats
+from time import time
 
 # torch data
 import torchvision
@@ -57,7 +58,11 @@ if __name__ == "__main__":
       # train
       g_optimizer = optim.SGD(dist_gan.generator.parameters(), lr=0.001, momentum=0.9)
       d_optimizer = optim.SGD(dist_gan.discriminator.parameters(), lr=0.001, momentum=0.9)
+
+      start_time = time()
       dist_gan.jensen_shannon_train(d_optimizer, g_optimizer, epochs, dsteps_per_gstep, printing=False)
+      end_time = time()
+      print("Completed Training in {} Seconds...".format(end_time - start_time))
 
     # generate
     num_samples_list = [1000, 10000, 100000]
@@ -86,7 +91,7 @@ if __name__ == "__main__":
       noise_dim = 100
       gen_hidden_dims = [20, 20] # hidden layer sizes for generator
       dis_hidden_dims = [20, 20] # hidden layer sizes for discriminator
-      epochs = 5 # number of training epochs
+      epochs = 100 # number of training epochs
       dsteps_per_gstep = 5 # TODO: adaptive dsteps_per_gstep
       batch_size = 10 # bacth size per step
       kernel_dim = 4 # for discriminator convolutions and generator deconvolutions
@@ -122,7 +127,11 @@ if __name__ == "__main__":
                                   "gaussian_mnist_image_gan")
       g_optimizer = optim.SGD(image_gan.generator.parameters(), lr=0.001, momentum=0.9)
       d_optimizer = optim.SGD(image_gan.discriminator.parameters(), lr=0.001, momentum=0.9)
+
+      start_time = time()
       image_gan.jensen_shannon_train(d_optimizer, g_optimizer, epochs, dsteps_per_gstep, printing=False)
+      end_time = time()
+      print("Completed Training in {} Seconds...".format(end_time - start_time))
 
     true_example_pixels = image_gan.discriminator.generate_true_samples(1).data[0].numpy()
     gen_example_pixels = image_gan.generator.generate_samples(1).data[0].numpy()
