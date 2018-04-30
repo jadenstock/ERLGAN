@@ -23,9 +23,12 @@ if __name__ == "__main__":
   save = "save" in sys.argv    # whether or not to save produced models
   load = "load" in sys.argv    # whether or not to load pretrained models
 
+  model_dir = "./models/"
+  image_dir = "./images/"
+
   if dist:
     if load:
-      dist_gan = load_gan("gaussian_chi_sq_dist_gan", "./models/")
+      dist_gan = load_gan("gaussian_chi_sq_dist_gan", model_dir)
     else:
       print("Setting up Distribution GAN for Training...")
       noise_dim = 1 # dimensionality of noise distribution
@@ -67,17 +70,17 @@ if __name__ == "__main__":
     p_g_apx, p_t_apx = p_apxs[num_samples_list[2]]
 
     # plot
-    plot_gan_vs_true_distribution_1D(p_g_apx, p_t_apx, "chi_squared_gan_vis.png")
+    plot_gan_vs_true_distribution_1D(p_g_apx, p_t_apx, image_dir, "chi_squared_gan_vis.png")
 
     # tv distance
     print(tv_dists)
 
     if save:
-      save_gan(dist_gan, "./models/")
+      save_gan(dist_gan, model_dir)
 
   if image:
     if load:
-      image_gan = load_gan("gaussian_mnist_image_gan", "./models/")
+      image_gan = load_gan("gaussian_mnist_image_gan", model_dir)
     else:
       print("Setting up Image GAN for Training...")
       noise_dim = 100
@@ -95,7 +98,7 @@ if __name__ == "__main__":
                                                    transform=transforms.ToTensor())
       # NOTE: useful for getting a subset just to test if the code works
       # Need to comment out to do proper training
-#      mnist_train_set = DatasetIntervalSubset(mnist_train_set, 0, 10)
+      mnist_train_set = DatasetIntervalSubset(mnist_train_set, 0, 10)
       mnist_dist_loader = torch.utils.data.DataLoader(mnist_train_set,
                                                       batch_size=batch_size,
                                                       shuffle=True, #shuffles the data? good
@@ -125,9 +128,9 @@ if __name__ == "__main__":
     gen_example_pixels = image_gan.generator.generate_samples(1).data[0].numpy()
     true_example_pixels = np.squeeze(true_example_pixels, axis=0)
     gen_example_pixels = np.squeeze(gen_example_pixels, axis=0)
-    generate_grayscale_image(true_example_pixels, "true_example.png")
-    generate_grayscale_image(gen_example_pixels, "generator_example.png")
+    generate_grayscale_image(true_example_pixels, image_dir, "true_example.png")
+    generate_grayscale_image(gen_example_pixels, image_dir, "generator_example.png")
 
     if save:
-      save_gan(image_gan, "./models/")
+      save_gan(image_gan, model_dir)
 

@@ -73,7 +73,7 @@ def test_gan_efficiency(noise_distribution, generator, target_distribution, num_
 
 ##### Plotting Utilities #####
 
-def plot_gan_vs_true_distribution_1D(p_g_apx, p_t_apx, filename, title=None):
+def plot_gan_vs_true_distribution_1D(p_g_apx, p_t_apx, dir_path, filename, title=None):
   p_g_xs, p_g_ys = zip(*p_g_apx.items())
   p_t_xs, p_t_ys = zip(*p_t_apx.items())
   plt.scatter(p_g_xs, p_g_ys, color='b', label='GAN')
@@ -83,11 +83,11 @@ def plot_gan_vs_true_distribution_1D(p_g_apx, p_t_apx, filename, title=None):
   plt.xlabel("Binned Samples")
   plt.ylabel("Bin Probabilities")
   plt.legend()
-  plt.savefig(filename)
+  plt.savefig(os.path.join(dir_path, filename))
 
-def generate_grayscale_image(pixels, filename):
+def generate_grayscale_image(pixels, dir_path, filename):
   plt.imshow(pixels, cmap="gray")
-  plt.savefig(filename)
+  plt.savefig(os.path.join(dir_path, filename))
 
 ##############################
 
