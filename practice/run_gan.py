@@ -40,7 +40,7 @@ if __name__ == "__main__":
       dsteps_per_gstep = 5 # TODO: adaptive dsteps_per_gstep
       batch_size = 10 # bacth size per step
 
-      num_samples = 10
+      num_samples = 50000
       noise_dist_sampler = lambda : np.random.normal(loc=0.0, scale=1.0, size=noise_dim)
       target_dist_sampler = lambda : np.random.chisquare(df=df, size=sample_dim)
       
@@ -98,7 +98,7 @@ if __name__ == "__main__":
                                                    transform=transforms.ToTensor())
       # NOTE: useful for getting a subset just to test if the code works
       # Need to comment out to do proper training
-      mnist_train_set = DatasetIntervalSubset(mnist_train_set, 0, 10)
+#      mnist_train_set = DatasetIntervalSubset(mnist_train_set, 0, 10)
       mnist_dist_loader = torch.utils.data.DataLoader(mnist_train_set,
                                                       batch_size=batch_size,
                                                       shuffle=True, #shuffles the data? good
