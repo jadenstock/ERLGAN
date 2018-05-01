@@ -17,7 +17,7 @@ import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 
-from utils import gaussian_parzen_NLL_estimate
+#from utils import gaussian_parzen_NLL_estimate
 
 class GAN:
 
@@ -110,8 +110,8 @@ class GAN:
       if eval_sample_size > 0:
         generator_samples = self.generator.generate_samples(eval_sample_size).data.numpy()
         true_samples = self.discriminator.generate_true_samples(eval_sample_size).data.numpy()
-        fit_generator_true_NLL[epoch] = gaussian_parzen_NLL_estimate(generator_samples, true_samples)
-        fit_true_generator_NLL[epoch] = gaussian_parzen_NLL_estimate(true_samples, generator_samples)
+#        fit_generator_true_NLL[epoch] = gaussian_parzen_NLL_estimate(generator_samples, true_samples)
+#        fit_true_generator_NLL[epoch] = gaussian_parzen_NLL_estimate(true_samples, generator_samples)
 
     sys.stdout.write("\n")
     if eval_sample_size > 0:
