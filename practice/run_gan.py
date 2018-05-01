@@ -19,10 +19,12 @@ seed = None
 np.random.seed(seed)
 
 if __name__ == "__main__":
-  dist = "dist" in sys.argv    # train distribution gan
-  image = "image" in sys.argv  # train image gan
-  save = "save" in sys.argv    # whether or not to save produced models
-  load = "load" in sys.argv    # whether or not to load pretrained models
+  args = set(sys.argv)
+  dist = "dist" in args    # train distribution gan
+  image = "image" in args  # train image gan
+  save = "save" in args    # whether or not to save produced models
+  load = "load" in args    # whether or not to load pretrained models
+  train = "train" in args  # whether or not to do training
 
   model_dir = "./models/"
   image_dir = "./images/"
@@ -37,8 +39,6 @@ if __name__ == "__main__":
       gen_hidden_dim = 10 # hidden layer size for generator
       dis_hidden_dim = 10 # hidden layer size for discriminator
       df = 4 # for Chi dist.
-      epochs = 5 # number of training epochs
-      dsteps_per_gstep = 5 # TODO: adaptive dsteps_per_gstep
       batch_size = 10 # bacth size per step
 
       num_samples = 50000
@@ -55,7 +55,11 @@ if __name__ == "__main__":
                                 dis_hidden_dim,
                                 "gaussian_chi_sq_dist_gan")
 
-      # train
+    # train
+    if train:
+      epochs = 5 # number of training epochs
+      dsteps_per_gstep = 5 # TODO: adaptive dsteps_per_gstep
+
       g_optimizer = optim.SGD(dist_gan.generator.parameters(), lr=0.001, momentum=0.9)
       d_optimizer = optim.SGD(dist_gan.discriminator.parameters(), lr=0.001, momentum=0.9)
 
@@ -84,15 +88,13 @@ if __name__ == "__main__":
       save_gan(dist_gan, model_dir)
 
   if image:
+    noise_dim = 100
     if load:
       image_gan = load_gan("gaussian_mnist_image_gan", model_dir)
     else:
       print("Setting up Image GAN for Training...")
-      noise_dim = 100
       gen_hidden_dims = [20, 20] # hidden layer sizes for generator
       dis_hidden_dims = [20, 20] # hidden layer sizes for discriminator
-      epochs = 100 # number of training epochs
-      dsteps_per_gstep = 5 # TODO: adaptive dsteps_per_gstep
       batch_size = 10 # bacth size per step
       kernel_dim = 4 # for discriminator convolutions and generator deconvolutions
 
@@ -103,7 +105,7 @@ if __name__ == "__main__":
                                                    transform=transforms.ToTensor())
       # NOTE: useful for getting a subset just to test if the code works
       # Need to comment out to do proper training
-#      mnist_train_set = DatasetIntervalSubset(mnist_train_set, 0, 10)
+      mnist_train_set = DatasetIntervalSubset(mnist_train_set, 0, 10)
       mnist_dist_loader = torch.utils.data.DataLoader(mnist_train_set,
                                                       batch_size=batch_size,
                                                       shuffle=True, #shuffles the data? good
@@ -125,6 +127,10 @@ if __name__ == "__main__":
                                   dis_hidden_dims,
                                   kernel_dim,
                                   "gaussian_mnist_image_gan")
+    if train:
+      epochs = 100 # number of training epochs
+      dsteps_per_gstep = 5 # TODO: adaptive dsteps_per_gstep
+
       g_optimizer = optim.SGD(image_gan.generator.parameters(), lr=0.001, momentum=0.9)
       d_optimizer = optim.SGD(image_gan.discriminator.parameters(), lr=0.001, momentum=0.9)
 

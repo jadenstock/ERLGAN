@@ -111,12 +111,20 @@ def save_gan(gan, dir_path):
   torch.save(gan.discriminator, os.path.join(dir_path, gan.name + ".discriminator.pth"), pickle_module=dill)
 
 def load_gan(name, dir_path):
+  g = None
+  d = None
   try:
-    g = torch.load(os.path.join(dir_path, name + ".generator.pth"))
-    d = torch.load(os.path.join(dir_path, name + ".discriminator.pth"))
-    return GAN(g, d, name)
+    g = torch.load(os.path.join(dir_path, name + ".generator.pth"), pickle_module=dill)
   except:
-    print("Could not load gan \"{}\" from {}".format(name, dir_path))
+    print("Could not load generator \"{}\" from {}".format(name, dir_path))
+  try:
+    d = torch.load(os.path.join(dir_path, name + ".discriminator.pth"), pickle_module=dill)
+  except:
+    print("Could not load discriminator \"{}\" from {}".format(name + ".discriminator.pth", dir_path))
+  if g is not None and d is not None:
+    return GAN(g, d, name)
+  else:
     return None
 
 ##############################################
+
