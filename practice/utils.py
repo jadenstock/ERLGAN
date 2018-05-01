@@ -75,7 +75,7 @@ def test_gan_efficiency(noise_distribution, generator, target_distribution, num_
 # This is the method that the original GAN paper uses and seems to be a
 # standard technique. Unfortunately estimates can have high variance so we
 # need to be careful.
-def gaussian_parzen_LL_estimate(fit_data, predict_data):
+def gaussian_parzen_NLL_estimate(fit_data, predict_data):
   # handles case when we're estimating a 1D distribution
   if fit_data.shape[1] == 1:
     fit_data = fit_data.squeeze(1)

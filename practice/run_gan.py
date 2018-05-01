@@ -60,7 +60,7 @@ if __name__ == "__main__":
       epochs = 5 # number of training epochs
       dsteps_per_gstep = 5 # TODO: adaptive dsteps_per_gstep
       lr_sgd = 0.001
-      lr_adam = 0.00025
+      lr_adam = 0.0001
       eval_sample_size = 250
 #      g_optimizer = optim.SGD(dist_gan.generator.parameters(), lr=lr_sgd, momentum=0.9)
 #      d_optimizer = optim.SGD(dist_gan.discriminator.parameters(), lr=lr_sgd, momentum=0.9)

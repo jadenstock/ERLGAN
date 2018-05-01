@@ -17,7 +17,7 @@ import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 
-from utils import gaussian_parzen_LL_estimate
+from utils import gaussian_parzen_NLL_estimate
 
 class GAN:
 
@@ -55,8 +55,8 @@ class GAN:
     discrim_samples_used = 0
     batch_size = self.discriminator.target_dist_loader.batch_size
 
-    fit_generator_true_LL = np.zeros(epochs) if eval_sample_size > 0 else None
-    fit_true_generator_LL = np.zeros(epochs) if eval_sample_size > 0 else None
+    fit_generator_true_NLL = np.zeros(epochs) if eval_sample_size > 0 else None
+    fit_true_generator_NLL = np.zeros(epochs) if eval_sample_size > 0 else None
 
     for epoch in range(epochs):
 
@@ -110,13 +110,13 @@ class GAN:
       if eval_sample_size > 0:
         generator_samples = self.generator.generate_samples(eval_sample_size).data.numpy()
         true_samples = self.discriminator.generate_true_samples(eval_sample_size).data.numpy()
-        fit_generator_true_LL[epoch] = gaussian_parzen_LL_estimate(generator_samples, true_samples)
-        fit_true_generator_LL[epoch] = gaussian_parzen_LL_estimate(true_samples, generator_samples)
+        fit_generator_true_NLL[epoch] = gaussian_parzen_NLL_estimate(generator_samples, true_samples)
+        fit_true_generator_NLL[epoch] = gaussian_parzen_NLL_estimate(true_samples, generator_samples)
 
     sys.stdout.write("\n")
     if eval_sample_size > 0:
-      print("Estimated LL Progression of True Samples Given Generator Samples: {}".format(fit_generator_true_LL))
-      print("Estimated LL Progression of Generator Samples Given True Samples: {}".format(fit_true_generator_LL))
+      print("Estimated LL Progression of True Samples Given Generator Samples: {}".format(fit_generator_true_NLL))
+      print("Estimated LL Progression of Generator Samples Given True Samples: {}".format(fit_true_generator_NLL))
 
   # train using wasserstein L1 distance (see vanilla WGAN) and naive clipping procedure
   # to maintain Lipschitz condition
