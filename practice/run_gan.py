@@ -105,7 +105,7 @@ if __name__ == "__main__":
                                                    transform=transforms.ToTensor())
       # NOTE: useful for getting a subset just to test if the code works
       # Need to comment out to do proper training
-      mnist_train_set = DatasetIntervalSubset(mnist_train_set, 0, 10)
+#      mnist_train_set = DatasetIntervalSubset(mnist_train_set, 0, 10)
       mnist_dist_loader = torch.utils.data.DataLoader(mnist_train_set,
                                                       batch_size=batch_size,
                                                       shuffle=True, #shuffles the data? good
