@@ -59,12 +59,17 @@ if __name__ == "__main__":
     if train:
       epochs = 5 # number of training epochs
       dsteps_per_gstep = 5 # TODO: adaptive dsteps_per_gstep
+      lr_sgd = 0.001
+      lr_adam = 0.00025
+      eval_sample_size = 250
+#      g_optimizer = optim.SGD(dist_gan.generator.parameters(), lr=lr_sgd, momentum=0.9)
+#      d_optimizer = optim.SGD(dist_gan.discriminator.parameters(), lr=lr_sgd, momentum=0.9)
 
-      g_optimizer = optim.SGD(dist_gan.generator.parameters(), lr=0.001, momentum=0.9)
-      d_optimizer = optim.SGD(dist_gan.discriminator.parameters(), lr=0.001, momentum=0.9)
+      g_optimizer = optim.Adam(dist_gan.generator.parameters(), lr=lr_adam)
+      d_optimizer = optim.Adam(dist_gan.discriminator.parameters(), lr=lr_adam)
 
       start_time = time()
-      dist_gan.jensen_shannon_train(d_optimizer, g_optimizer, epochs, dsteps_per_gstep, printing=False)
+      dist_gan.jensen_shannon_train(d_optimizer, g_optimizer, epochs, dsteps_per_gstep, eval_sample_size, printing=False)
       end_time = time()
       print("Completed Training in {} Seconds...".format(end_time - start_time))
 
@@ -128,7 +133,7 @@ if __name__ == "__main__":
                                   kernel_dim,
                                   "gaussian_mnist_image_gan")
     if train:
-      epochs = 100 # number of training epochs
+      epochs = 400 # number of training epochs
       dsteps_per_gstep = 5 # TODO: adaptive dsteps_per_gstep
 
       g_optimizer = optim.SGD(image_gan.generator.parameters(), lr=0.001, momentum=0.9)

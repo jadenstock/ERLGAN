@@ -2,6 +2,8 @@
 import numpy as np
 #import multiprocessing as mp
 import sys
+from collections import Counter
+from scipy import stats
 
 # torch autograd, nn, etc.
 import torch
@@ -14,8 +16,8 @@ import torch.optim as optim
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
-from collections import Counter
-from scipy import stats
+
+from utils import gaussian_parzen_LL_estimate
 
 class GAN:
 
@@ -27,7 +29,7 @@ class GAN:
 
   # train using vanilla Jensen-Shannon divergence/KL divergence (see vanilla GAN)
   # (see also https://github.com/devnag/pytorch-generative-adversarial-networks/blob/master/gan_pytorch.py)
-  def jensen_shannon_train(self, d_optimizer, g_optimizer, epochs, dsteps_per_gstep, printing = False):
+  def jensen_shannon_train(self, d_optimizer, g_optimizer, epochs, dsteps_per_gstep, eval_sample_size=0, printing = False):
 
     def _discriminator_loss(doutputs_true, doutputs_fake):
       losses_true = torch.log(doutputs_true)
@@ -53,9 +55,12 @@ class GAN:
     discrim_samples_used = 0
     batch_size = self.discriminator.target_dist_loader.batch_size
 
+    fit_generator_true_LL = np.zeros(epochs) if eval_sample_size > 0 else None
+    fit_true_generator_LL = np.zeros(epochs) if eval_sample_size > 0 else None
+
     for epoch in range(epochs):
 
-      if printing: print("epoch {}...".format(epoch))
+      if printing: print("Epoch {}...".format(epoch + 1))
 
       # -----------------------
       # Train the discriminator
@@ -102,7 +107,16 @@ class GAN:
           sys.stdout.flush()
         
         discrim_samples_used += batch_size
+      if eval_sample_size > 0:
+        generator_samples = self.generator.generate_samples(eval_sample_size).data.numpy()
+        true_samples = self.discriminator.generate_true_samples(eval_sample_size).data.numpy()
+        fit_generator_true_LL[epoch] = gaussian_parzen_LL_estimate(generator_samples, true_samples)
+        fit_true_generator_LL[epoch] = gaussian_parzen_LL_estimate(true_samples, generator_samples)
+
     sys.stdout.write("\n")
+    if eval_sample_size > 0:
+      print("Estimated LL Progression of True Samples Given Generator Samples: {}".format(fit_generator_true_LL))
+      print("Estimated LL Progression of Generator Samples Given True Samples: {}".format(fit_true_generator_LL))
 
   # train using wasserstein L1 distance (see vanilla WGAN) and naive clipping procedure
   # to maintain Lipschitz condition

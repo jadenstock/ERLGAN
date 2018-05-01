@@ -2,6 +2,8 @@
 import numpy as np
 import sys
 import os
+from collections import Counter
+from scipy import stats
 
 # torch autograd, nn, etc.
 import torch
@@ -14,8 +16,6 @@ import torch.optim as optim
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
-from collections import Counter
-from scipy import stats
 
 # all gans
 from gan import *
@@ -68,6 +68,23 @@ def test_gan_efficiency(noise_distribution, generator, target_distribution, num_
     tv_dists[num_samples] = tv_dist
     p_apxs[num_samples] = (p_g_apx, p_t_apx)
   return tv_dists, p_apxs
+
+# https://stats.stackexchange.com/questions/244012/can-you-explain-parzen-window-kernel-density-estimation-in-laymans-terms/244023
+#
+# Kernel estimation is an alternative to binning the samples into a histogram.
+# This is the method that the original GAN paper uses and seems to be a
+# standard technique. Unfortunately estimates can have high variance so we
+# need to be careful.
+def gaussian_parzen_LL_estimate(fit_data, predict_data):
+  # handles case when we're estimating a 1D distribution
+  if fit_data.shape[1] == 1:
+    fit_data = fit_data.squeeze(1)
+  if predict_data.shape[1] == 1:
+    predict_data = predict_data.squeeze(1)
+  # TODO: implement cross validation to select bandwidth
+  bandwidth = 'silverman'
+  kernel_model = stats.gaussian_kde(fit_data, bandwidth)
+  return -1.0 * np.sum(kernel_model.logpdf(predict_data))
 
 ######################################
 
