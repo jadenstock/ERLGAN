@@ -4,6 +4,13 @@ import torch
 import torchvision
 import torch.utils.data as data
 
+def binarize_image_tensor(image_tensor, dim=0, threshold=0.5):
+  thresh = lambda x : np.float32(x <= threshold)
+  return torch.FloatTensor(thresh(image_tensor.squeeze().numpy())).unsqueeze(dim)
+
+binarization_transform = torchvision.transforms.Lambda(lambda x : binarize_image_tensor(x))
+squeeze_transform = torchvision.transforms.Lambda(lambda x : x.view(x.size()[0] * x.size()[1]))
+
 # These dataset subset classes are useful for downsizing an entire dataset
 # to speed up training. This is useful if you want to train a bad model
 # quickly just to verify that the code itself all works.

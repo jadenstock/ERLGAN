@@ -17,6 +17,8 @@ import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 
+from datasets import binarize_image_tensor
+
 #from utils import gaussian_parzen_NLL_estimate
 
 class GAN:
@@ -235,6 +237,7 @@ class ImageGenerator(nn.Module):
     x = x.view(-1, 1, self.pre_deconv_width, self.pre_deconv_height)
     x = self.deconv1(x)
     x = self.deconv2(x)
+    x = Variable(binarize_image_tensor(x.data, 1)) # TODO REMOVE LATER
     return x
 
   def generate_samples(self, batch_size):

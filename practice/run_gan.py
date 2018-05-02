@@ -104,13 +104,14 @@ if __name__ == "__main__":
       kernel_dim = 4 # for discriminator convolutions and generator deconvolutions
 
       ### code special for mnist ###
+      transform = transforms.Compose([transforms.ToTensor(), binarization_transform])
       mnist_train_set = torchvision.datasets.MNIST(root="./mnist",
                                                    train=True,
                                                    download=True,
-                                                   transform=transforms.ToTensor())
+                                                   transform=transform)
       # NOTE: useful for getting a subset just to test if the code works
       # Need to comment out to do proper training
-#      mnist_train_set = DatasetIntervalSubset(mnist_train_set, 0, 10)
+#      mnist_train_set = DatasetIntervalSubset(mnist_train_set, 0, 10000)
       mnist_dist_loader = torch.utils.data.DataLoader(mnist_train_set,
                                                       batch_size=batch_size,
                                                       shuffle=True, #shuffles the data? good
@@ -133,7 +134,7 @@ if __name__ == "__main__":
                                   kernel_dim,
                                   "gaussian_mnist_image_gan")
     if train:
-      epochs = 400 # number of training epochs
+      epochs = 5 # number of training epochs
       dsteps_per_gstep = 5 # TODO: adaptive dsteps_per_gstep
 
       g_optimizer = optim.SGD(image_gan.generator.parameters(), lr=0.001, momentum=0.9)
@@ -144,12 +145,12 @@ if __name__ == "__main__":
       end_time = time()
       print("Completed Training in {} Seconds...".format(end_time - start_time))
 
-    true_example_pixels = image_gan.discriminator.generate_true_samples(1).data[0].numpy()
-    gen_example_pixels = image_gan.generator.generate_samples(1).data[0].numpy()
-    true_example_pixels = np.squeeze(true_example_pixels, axis=0)
-    gen_example_pixels = np.squeeze(gen_example_pixels, axis=0)
-    generate_grayscale_image(true_example_pixels, image_dir, "true_example.png")
-    generate_grayscale_image(gen_example_pixels, image_dir, "generator_example.png")
+    n_samples = 10
+    true_example_pixels = image_gan.discriminator.generate_true_samples(n_samples).data.numpy()
+    gen_example_pixels = image_gan.generator.generate_samples(n_samples).data.numpy()
+    for i in range(n_samples):
+      generate_grayscale_image(np.squeeze(true_example_pixels[i]), image_dir, "true_example_{}.png".format(i))
+      generate_grayscale_image(np.squeeze(gen_example_pixels[i]), image_dir, "generator_example_{}.png".format(i))
 
     if save:
       save_gan(image_gan, model_dir)
